@@ -38,6 +38,7 @@ def load_rooms():
 
 
 def save_rooms(rooms):
+    os.makedirs(DATA_DIR, exist_ok=True)
     tmp = ROOMS_FILE + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(rooms, f, ensure_ascii=False, indent=1)
