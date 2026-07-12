@@ -10,3 +10,6 @@ node_modules/
 __pycache__/
 .vercel
 korea_blank_map.svg
+
+.vercel
+.env*
