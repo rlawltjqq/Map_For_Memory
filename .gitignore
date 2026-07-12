@@ -1,0 +1,12 @@
+# 로컬 데이터 (방문 기록·사진 — 배포판은 Redis/Blob 사용)
+data/
+
+# 대용량 원본 지도 데이터 (README의 출처에서 다시 받을 수 있음)
+korea_provinces.geojson
+korea_municipalities.geojson
+
+# 기타
+node_modules/
+__pycache__/
+.vercel
+korea_blank_map.svg

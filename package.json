@@ -1,0 +1,9 @@
+{
+  "name": "map-for-memory",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@upstash/redis": "^1.34.0",
+    "@vercel/blob": "^1.1.0"
+  }
+}

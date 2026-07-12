@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>나의 여행 지도</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+    background: #f4f6f9; color: #1f2937; height: 100vh; display: flex; flex-direction: column;
+  }
+  button { font-family: inherit; }
+  input { font-family: inherit; }
+
+  /* ---- 랜딩 ---- */
+  #landing { flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  #landing .card {
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 32px 28px;
+    width: 100%; max-width: 400px; box-shadow: 0 4px 20px rgba(0,0,0,.05);
+  }
+  #landing h1 { font-size: 22px; text-align: center; }
+  #landing .desc { font-size: 13px; color: #6b7280; text-align: center; margin: 6px 0 22px; }
+  #landing h3 { font-size: 13px; color: #6b7280; margin: 16px 0 8px; }
+  #landing input {
+    width: 100%; padding: 10px 12px; font-size: 14px; border: 1px solid #d1d5db;
+    border-radius: 8px; margin-bottom: 8px;
+  }
+  #landing .primary {
+    width: 100%; padding: 10px; font-size: 14px; font-weight: 600; border: none;
+    border-radius: 8px; background: #3b9c6e; color: #fff; cursor: pointer;
+  }
+  #landing .primary:hover { background: #2f7d58; }
+  .err { font-size: 12.5px; color: #b91c1c; margin-top: 6px; min-height: 16px; }
+  #myRooms a {
+    display: block; padding: 9px 12px; border: 1px solid #e5e7eb; border-radius: 8px;
+    margin-bottom: 6px; font-size: 14px; color: #1f2937; text-decoration: none;
+  }
+  #myRooms a:hover { background: #f3f4f6; }
+  #landing .tip { font-size: 12px; color: #9ca3af; margin-top: 16px; text-align: center; }
+
+  /* ---- 앱 ---- */
+  #app { flex: 1; display: none; flex-direction: column; min-height: 0; }
+  header {
+    padding: 10px 16px; background: #fff; border-bottom: 1px solid #e5e7eb;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 17px; }
+  #roomName { font-size: 14px; font-weight: 600; color: #3b9c6e; }
+  header .hbtn {
+    font-size: 12px; padding: 5px 10px; border-radius: 999px; cursor: pointer;
+    border: 1px solid #d1d5db; background: #fff; color: #374151;
+  }
+  header .hbtn:hover { background: #f3f4f6; }
+  #syncBadge { font-size: 12px; padding: 3px 10px; border-radius: 999px; margin-left: auto; }
+  #syncBadge.on { background: #dcf5e8; color: #1a7a4d; }
+  #syncBadge.off { background: #fee2e2; color: #b91c1c; }
+  .layout { flex: 1; display: flex; min-height: 0; }
+  .map-wrap {
+    flex: 1; position: relative; overflow: hidden; touch-action: none;
+    background: linear-gradient(180deg, #eaf2fa 0%, #f4f6f9 100%);
+  }
+  #map { width: 100%; height: 100%; display: block; cursor: grab; }
+  #map.dragging { cursor: grabbing; }
+  #municipalities path { transition: fill .15s; cursor: pointer; }
+  #municipalities path:hover { fill: #cfe3f7; }
+  #municipalities path.visited { fill: #3b9c6e; }
+  #municipalities path.visited:hover { fill: #2f7d58; }
+  #municipalities path.selected { stroke: #1d4ed8; stroke-width: 1.6; }
+  #muniLabels text.on-visited { fill: #fff; stroke: #1f5c3e; }
+  .zoom-btns { position: absolute; right: 14px; bottom: 14px; display: flex; flex-direction: column; gap: 6px; }
+  .zoom-btns button {
+    width: 38px; height: 38px; border: 1px solid #d1d5db; background: #fff; border-radius: 8px;
+    font-size: 18px; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  }
+  .zoom-btns button:hover { background: #f3f4f6; }
+  aside {
+    width: 310px; background: #fff; border-left: 1px solid #e5e7eb;
+    padding: 16px; overflow-y: auto; flex-shrink: 0;
+  }
+  .big-stat { text-align: center; }
+  .big-stat .pct { font-size: 40px; font-weight: 700; color: #3b9c6e; }
+  .big-stat .cnt { font-size: 13px; color: #6b7280; margin-top: 2px; }
+  .total-bar { height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; margin: 10px 0 14px; }
+  .total-bar > div { height: 100%; background: #3b9c6e; border-radius: 4px; width: 0; transition: width .3s; }
+  h2 { font-size: 12.5px; color: #6b7280; font-weight: 600; margin: 14px 0 8px; }
+
+  #regionPanel { border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; background: #fafbfc; }
+  #regionPanel .hint { font-size: 12.5px; color: #9ca3af; text-align: center; padding: 6px 0; }
+  #rpHead { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  #rpName { font-size: 15px; font-weight: 700; }
+  #rpProv { font-size: 12px; color: #6b7280; }
+  #rpToggle {
+    margin-left: auto; font-size: 12px; padding: 5px 10px; border-radius: 999px; cursor: pointer;
+    border: 1px solid #d1d5db; background: #fff; color: #374151; white-space: nowrap;
+  }
+  #rpToggle.v { background: #3b9c6e; border-color: #3b9c6e; color: #fff; }
+  #photoGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 8px; }
+  #photoGrid .ph { position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden; cursor: pointer; }
+  #photoGrid img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  #photoGrid .del {
+    position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(0,0,0,.55); color: #fff; border: none; font-size: 12px; line-height: 1;
+    cursor: pointer; display: none;
+  }
+  #photoGrid .ph:hover .del { display: block; }
+  .upload-btn {
+    display: block; text-align: center; font-size: 13px; padding: 8px; border-radius: 8px;
+    border: 1px dashed #9ca3af; color: #4b5563; cursor: pointer; background: #fff;
+  }
+  .upload-btn:hover { background: #f3f4f6; }
+  #uploadMsg { font-size: 11.5px; color: #9ca3af; text-align: center; margin-top: 6px; }
+
+  .prov-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; padding: 2.5px 0; }
+  .prov-row .name { width: 34px; color: #374151; }
+  .prov-row .bar { flex: 1; height: 6px; background: #eef0f3; border-radius: 3px; overflow: hidden; }
+  .prov-row .bar > div { height: 100%; background: #7fc9a4; border-radius: 3px; }
+  .prov-row.done .bar > div { background: #3b9c6e; }
+  .prov-row .num { width: 46px; text-align: right; color: #9ca3af; font-variant-numeric: tabular-nums; }
+  .btns { display: flex; gap: 8px; margin-top: 16px; }
+  .btns button {
+    flex: 1; padding: 8px 0; font-size: 13px; border-radius: 8px; cursor: pointer;
+    border: 1px solid #d1d5db; background: #fff; color: #374151;
+  }
+  .btns button:hover { background: #f3f4f6; }
+  .btns #resetBtn { color: #b91c1c; border-color: #fecaca; }
+  .btns #resetBtn:hover { background: #fef2f2; }
+  #tooltip {
+    position: fixed; pointer-events: none; background: rgba(31,41,55,.92); color: #fff;
+    font-size: 12.5px; padding: 5px 10px; border-radius: 6px; display: none; z-index: 10;
+    white-space: nowrap;
+  }
+  #tooltip .v { color: #8fe3b8; }
+  #lightbox {
+    position: fixed; inset: 0; background: rgba(0,0,0,.85); display: none;
+    align-items: center; justify-content: center; z-index: 20; cursor: zoom-out;
+  }
+  #lightbox img { max-width: 92vw; max-height: 92vh; border-radius: 6px; }
+
+  /* ---- 암호 입력 모달 ---- */
+  #joinModal {
+    position: fixed; inset: 0; background: rgba(0,0,0,.4); display: none;
+    align-items: center; justify-content: center; z-index: 30;
+  }
+  #joinModal .card {
+    background: #fff; border-radius: 14px; padding: 26px 24px; width: 90%; max-width: 340px;
+  }
+  #joinModal h3 { font-size: 16px; margin-bottom: 4px; }
+  #joinModal p { font-size: 12.5px; color: #6b7280; margin-bottom: 14px; }
+  #joinModal input {
+    width: 100%; padding: 10px 12px; font-size: 14px; border: 1px solid #d1d5db;
+    border-radius: 8px; margin-bottom: 8px;
+  }
+  #joinModal button {
+    width: 100%; padding: 10px; font-size: 14px; font-weight: 600; border: none;
+    border-radius: 8px; background: #3b9c6e; color: #fff; cursor: pointer;
+  }
+
+  @media (max-width: 720px) {
+    .layout { flex-direction: column; }
+    aside { width: 100%; border-left: none; border-top: 1px solid #e5e7eb; max-height: 48%; }
+    .big-stat .pct { font-size: 30px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="landing">
+  <div class="card">
+    <h1>🗺️ 나의 여행 지도</h1>
+    <div class="desc">가본 시·군·구를 함께 색칠하고 사진을 남겨요</div>
+    <h3>새 지도 만들기</h3>
+    <input id="newName" placeholder="지도 이름 (예: 우리 가족 여행지도)" maxlength="40">
+    <input id="newPw" type="password" placeholder="공유 암호 (4자 이상)">
+    <button class="primary" id="createBtn">지도 만들기</button>
+    <div class="err" id="createErr"></div>
+    <div id="myRoomsWrap" style="display:none">
+      <h3>내 지도</h3>
+      <div id="myRooms"></div>
+    </div>
+    <div class="tip">초대받았다면 받은 링크로 접속한 뒤 암호를 입력하세요.</div>
+  </div>
+</div>
+
+<div id="app">
+  <header>
+    <h1>🗺️</h1>
+    <span id="roomName"></span>
+    <button class="hbtn" id="inviteBtn">🔗 초대 링크 복사</button>
+    <button class="hbtn" id="leaveBtn">지도 목록</button>
+    <span id="syncBadge" class="on"></span>
+  </header>
+  <div class="layout">
+    <div class="map-wrap" id="mapWrap">
+      __SVG__
+      <div class="zoom-btns">
+        <button id="zoomIn" title="확대">+</button>
+        <button id="zoomOut" title="축소">−</button>
+        <button id="zoomReset" title="원래대로" style="font-size:13px">⟲</button>
+      </div>
+    </div>
+    <aside>
+      <div class="big-stat">
+        <div class="pct" id="pct">0%</div>
+        <div class="cnt"><span id="cnt">0</span> / <span id="total">0</span> 시·군·구</div>
+      </div>
+      <div class="total-bar"><div id="totalBar"></div></div>
+
+      <div id="regionPanel">
+        <div class="hint" id="rpHint">지도에서 지역을 클릭하면<br>사진을 추가할 수 있어요 📷</div>
+        <div id="rpBody" style="display:none">
+          <div id="rpHead">
+            <div><div id="rpName"></div><div id="rpProv"></div></div>
+            <button id="rpToggle"></button>
+          </div>
+          <div id="photoGrid"></div>
+          <label class="upload-btn" id="uploadBtn">📷 사진 추가<input type="file" id="photoInput" accept="image/*" multiple hidden></label>
+          <div id="uploadMsg"></div>
+        </div>
+      </div>
+
+      <h2>시·도별 달성률</h2>
+      <div id="provList"></div>
+      <div class="btns">
+        <button id="exportBtn">내보내기</button>
+        <button id="importBtn">가져오기</button>
+        <button id="resetBtn">초기화</button>
+      </div>
+      <input type="file" id="importFile" accept=".json" style="display:none">
+    </aside>
+  </div>
+</div>
+
+<div id="joinModal">
+  <div class="card">
+    <h3 id="joinTitle">지도 입장</h3>
+    <p>이 지도의 공유 암호를 입력하세요.</p>
+    <input id="joinPw" type="password" placeholder="공유 암호" autocomplete="off">
+    <button id="joinBtn">입장하기</button>
+    <div class="err" id="joinErr"></div>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+<div id="lightbox"><img alt=""></div>
+
+<script>
+const PROV = __PROV__;
+const svg = document.getElementById("map");
+const paths = [...svg.querySelectorAll("#municipalities path")];
+const muniTexts = [...svg.querySelectorAll("#muniLabels text")];
+const provLabelsG = svg.querySelector("#provLabels");
+const tooltip = document.getElementById("tooltip");
+const $ = id => document.getElementById(id);
+
+let ROOM = null, TOKEN = null;
+let visited = new Set();
+let photos = {};   // code -> [{url, name}]
+let selected = null;
+let pollTimer = null;
+
+// 접속한 적 있는 지도 목록: {id: {name, token}}
+const savedRooms = JSON.parse(localStorage.getItem("travelRooms") || "{}");
+function rememberRoom(id, name, token) {
+  savedRooms[id] = { name, token };
+  localStorage.setItem("travelRooms", JSON.stringify(savedRooms));
+}
+
+// ---- API ----
+async function api(path, opts = {}) {
+  opts.headers = Object.assign({ "x-token": TOKEN || "" }, opts.headers || {});
+  const r = await fetch(path, opts);
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(body.error || r.status), { status: r.status });
+  return body;
+}
+function setBadge(on, text) {
+  const b = $("syncBadge");
+  b.className = on ? "on" : "off";
+  b.textContent = text || (on ? "🟢 동기화됨" : "🔴 연결 끊김");
+}
+
+// ---- 화면 전환 ----
+function showLanding() {
+  $("landing").style.display = "flex";
+  $("app").style.display = "none";
+  const ids = Object.keys(savedRooms);
+  $("myRoomsWrap").style.display = ids.length ? "" : "none";
+  $("myRooms").innerHTML = ids.map(id =>
+    `<a href="/?room=${id}">📍 ${savedRooms[id].name}</a>`).join("");
+}
+async function enterRoom(id) {
+  ROOM = id;
+  TOKEN = savedRooms[id] ? savedRooms[id].token : null;
+  try {
+    const s = await api(`/api/state?room=${id}`);
+    startApp(s);
+  } catch (e) {
+    if (e.status === 403 || e.status === 404) showJoin(id);
+    else { alert("서버에 연결할 수 없습니다."); showLanding(); }
+  }
+}
+function showJoin(id) {
+  $("joinModal").style.display = "flex";
+  $("joinPw").focus();
+  $("joinBtn").onclick = async () => {
+    $("joinErr").textContent = "";
+    try {
+      const j = await api("/api/join", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ room: id, password: $("joinPw").value })
+      });
+      TOKEN = j.token;
+      rememberRoom(id, j.name, j.token);
+      $("joinModal").style.display = "none";
+      const s = await api(`/api/state?room=${id}`);
+      startApp(s);
+    } catch (e) {
+      $("joinErr").textContent = e.message === "Failed to fetch" ? "서버 연결 실패" : e.message;
+    }
+  };
+  $("joinPw").onkeydown = e => { if (e.key === "Enter") $("joinBtn").click(); };
+}
+function startApp(state) {
+  $("landing").style.display = "none";
+  $("app").style.display = "flex";
+  $("roomName").textContent = state.name;
+  rememberRoom(ROOM, state.name, TOKEN);
+  applyState(state);
+  setBadge(true);
+  updateLabels();
+  clearInterval(pollTimer);
+  pollTimer = setInterval(refresh, 12000);   // 다른 사람의 변경 반영
+}
+function applyState(s) {
+  visited = new Set((s.visited || []).map(String));
+  photos = s.photos || {};
+  paths.forEach(p => p.classList.toggle("visited", visited.has(p.dataset.code)));
+  render();
+  if (selected) renderPanel();
+}
+async function refresh() {
+  try {
+    applyState(await api(`/api/state?room=${ROOM}`));
+    setBadge(true);
+    updateLabels();
+  } catch { setBadge(false); }
+}
+
+$("createBtn").onclick = async () => {
+  $("createErr").textContent = "";
+  try {
+    const j = await api("/api/rooms", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: $("newName").value.trim(), password: $("newPw").value })
+    });
+    TOKEN = j.token;
+    rememberRoom(j.id, j.name, j.token);
+    location.href = "/?room=" + j.id;
+  } catch (e) {
+    $("createErr").textContent = e.message === "Failed to fetch" ? "서버 연결 실패" : e.message;
+  }
+};
+$("inviteBtn").onclick = async () => {
+  const link = location.origin + "/?room=" + ROOM;
+  try { await navigator.clipboard.writeText(link); $("inviteBtn").textContent = "✓ 복사됨!"; }
+  catch { prompt("초대 링크:", link); }
+  setTimeout(() => { $("inviteBtn").textContent = "🔗 초대 링크 복사"; }, 1500);
+};
+$("leaveBtn").onclick = () => { location.href = "/"; };
+
+// ---- 클릭: 방문 토글 + 지역 선택 ----
+let downPos = null;
+paths.forEach(p => {
+  p.addEventListener("pointerdown", e => { downPos = [e.clientX, e.clientY]; });
+  p.addEventListener("pointerup", e => {
+    if (!downPos) return;
+    const moved = Math.hypot(e.clientX - downPos[0], e.clientY - downPos[1]);
+    downPos = null;
+    if (moved > 6) return;
+    toggleVisited(p.dataset.code);
+    select(p.dataset.code);
+  });
+});
+function toggleVisited(code) {
+  const p = paths.find(x => x.dataset.code === code);
+  const on = !visited.has(code);
+  if (on) { visited.add(code); p.classList.add("visited"); }
+  else { visited.delete(code); p.classList.remove("visited"); }
+  render(); updateLabels();
+  api("/api/visited", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ room: ROOM, code, on })
+  }).then(() => setBadge(true)).catch(() => setBadge(false));
+}
+
+// ---- 선택 지역 패널 ----
+function select(code) {
+  selected = code;
+  paths.forEach(p => p.classList.toggle("selected", p.dataset.code === code));
+  renderPanel();
+}
+function renderPanel() {
+  if (!selected) return;
+  const p = paths.find(x => x.dataset.code === selected);
+  $("rpHint").style.display = "none";
+  $("rpBody").style.display = "";
+  $("rpName").textContent = p.dataset.name;
+  $("rpProv").textContent = PROV[selected.slice(0, 2)] || "";
+  const v = visited.has(selected);
+  const t = $("rpToggle");
+  t.textContent = v ? "✓ 방문함" : "방문 표시";
+  t.className = v ? "v" : "";
+  const grid = $("photoGrid");
+  grid.innerHTML = "";
+  (photos[selected] || []).forEach(ph => {
+    const div = document.createElement("div");
+    div.className = "ph";
+    div.innerHTML = `<img src="${ph.url}" alt="${ph.name}" loading="lazy"><button class="del" title="삭제">✕</button>`;
+    div.querySelector("img").onclick = () => {
+      $("lightbox").style.display = "flex";
+      $("lightbox").querySelector("img").src = ph.url;
+    };
+    div.querySelector(".del").onclick = async e => {
+      e.stopPropagation();
+      if (!confirm("이 사진을 삭제할까요?")) return;
+      try {
+        await api(`/api/photo?room=${ROOM}&code=${selected}`, {
+          method: "DELETE", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: ph.url })
+        });
+        photos[selected] = (photos[selected] || []).filter(x => x.url !== ph.url);
+        if (!photos[selected].length) delete photos[selected];
+        renderPanel();
+      } catch { alert("삭제 실패"); }
+    };
+    grid.appendChild(div);
+  });
+}
+$("rpToggle").onclick = () => { if (selected) { toggleVisited(selected); renderPanel(); } };
+
+// 사진 압축: 긴 변 1600px, JPEG 품질 0.85 (Vercel 요청 크기 제한 대응 + 저장 용량 절약)
+async function compressImage(file) {
+  if (!/^image\//.test(file.type)) return { blob: file, name: file.name };
+  const img = await createImageBitmap(file).catch(() => null);
+  if (!img) return { blob: file, name: file.name };
+  const max = 1600;
+  const k = Math.min(1, max / Math.max(img.width, img.height));
+  if (k === 1 && file.size < 2 * 1024 * 1024) return { blob: file, name: file.name };
+  const c = document.createElement("canvas");
+  c.width = Math.round(img.width * k);
+  c.height = Math.round(img.height * k);
+  c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+  const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
+  if (!blob) return { blob: file, name: file.name };
+  return { blob, name: file.name.replace(/\.\w+$/, "") + ".jpg" };
+}
+$("photoInput").addEventListener("change", async e => {
+  if (!selected) { e.target.value = ""; return; }
+  const files = [...e.target.files];
+  e.target.value = "";
+  for (let i = 0; i < files.length; i++) {
+    $("uploadMsg").textContent = `업로드 중… (${i + 1}/${files.length})`;
+    try {
+      const { blob, name } = await compressImage(files[i]);
+      const j = await api(`/api/photo?room=${ROOM}&code=${selected}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/octet-stream", "X-Filename": encodeURIComponent(name) },
+        body: blob
+      });
+      (photos[selected] = photos[selected] || []).push({ url: j.url, name: j.name });
+    } catch { alert(`${files[i].name} 업로드 실패`); }
+  }
+  $("uploadMsg").textContent = "";
+  renderPanel();
+});
+$("lightbox").onclick = () => { $("lightbox").style.display = "none"; };
+
+// ---- 툴팁 ----
+paths.forEach(p => {
+  p.addEventListener("pointermove", e => {
+    const code = p.dataset.code;
+    const prov = PROV[code.slice(0, 2)] || "";
+    const mark = visited.has(code) ? ' <span class="v">✓ 방문</span>' : "";
+    const ph = (photos[code] || []).length;
+    tooltip.innerHTML = `${prov} ${p.dataset.name}${mark}${ph ? ` · 📷 ${ph}` : ""}`;
+    tooltip.style.display = "block";
+    tooltip.style.left = (e.clientX + 14) + "px";
+    tooltip.style.top = (e.clientY + 14) + "px";
+  });
+  p.addEventListener("pointerleave", () => { tooltip.style.display = "none"; });
+});
+
+// ---- 통계 ----
+const provCodes = Object.keys(PROV);
+const provTotals = {};
+paths.forEach(p => {
+  const pc = p.dataset.code.slice(0, 2);
+  provTotals[pc] = (provTotals[pc] || 0) + 1;
+});
+$("total").textContent = paths.length;
+const provList = $("provList");
+provCodes.forEach(pc => {
+  const row = document.createElement("div");
+  row.className = "prov-row"; row.id = "prov-" + pc;
+  row.innerHTML = `<span class="name">${PROV[pc]}</span><div class="bar"><div></div></div><span class="num"></span>`;
+  provList.appendChild(row);
+});
+function render() {
+  const n = visited.size;
+  $("cnt").textContent = n;
+  const pct = paths.length ? n / paths.length * 100 : 0;
+  $("pct").textContent = (pct > 0 && pct < 10 ? pct.toFixed(1) : Math.round(pct)) + "%";
+  $("totalBar").style.width = pct + "%";
+  const pv = {};
+  visited.forEach(c => { const pc = c.slice(0, 2); pv[pc] = (pv[pc] || 0) + 1; });
+  provCodes.forEach(pc => {
+    const row = $("prov-" + pc);
+    const v = pv[pc] || 0, t = provTotals[pc] || 0;
+    row.querySelector(".bar > div").style.width = (t ? v / t * 100 : 0) + "%";
+    row.querySelector(".num").textContent = `${v}/${t}`;
+    row.classList.toggle("done", v === t && t > 0);
+  });
+}
+
+// ---- 확대/이동 + 라벨 표시 ----
+const VB0 = svg.viewBox.baseVal;
+const home = { x: VB0.x, y: VB0.y, w: VB0.width, h: VB0.height };
+let vb = { ...home };
+function applyVB() {
+  svg.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+  updateLabels();
+}
+function updateLabels() {
+  const rect = svg.getBoundingClientRect();
+  if (!rect.width) return;
+  const pxPerUnit = rect.width / vb.w;
+  svg.querySelector("#muniLabels").style.fontSize = (11 / pxPerUnit) + "px";
+  provLabelsG.style.fontSize = (14 / pxPerUnit) + "px";
+  const showMuni = vb.w <= 620;
+  provLabelsG.style.display = showMuni ? "none" : "";
+  muniTexts.forEach(t => {
+    if (!showMuni) { t.style.display = "none"; return; }
+    const fits = parseFloat(t.dataset.w) * pxPerUnit > t.textContent.length * 11 + 8;
+    t.style.display = fits ? "" : "none";
+    t.classList.toggle("on-visited", visited.has(t.dataset.code));
+  });
+}
+function zoomAt(cx, cy, factor) {
+  const newW = Math.min(home.w * 2, Math.max(home.w / 20, vb.w * factor));
+  const k = newW / vb.w;
+  vb.x = cx - (cx - vb.x) * k;
+  vb.y = cy - (cy - vb.y) * k;
+  vb.w = newW; vb.h = vb.h * k;
+  applyVB();
+}
+function clientToSvg(e) {
+  const r = svg.getBoundingClientRect();
+  return [vb.x + (e.clientX - r.left) / r.width * vb.w,
+          vb.y + (e.clientY - r.top) / r.height * vb.h];
+}
+svg.addEventListener("wheel", e => {
+  e.preventDefault();
+  const [cx, cy] = clientToSvg(e);
+  zoomAt(cx, cy, e.deltaY > 0 ? 1.2 : 1 / 1.2);
+}, { passive: false });
+$("zoomIn").onclick = () => zoomAt(vb.x + vb.w / 2, vb.y + vb.h / 2, 1 / 1.4);
+$("zoomOut").onclick = () => zoomAt(vb.x + vb.w / 2, vb.y + vb.h / 2, 1.4);
+$("zoomReset").onclick = () => { vb = { ...home }; applyVB(); };
+window.addEventListener("resize", updateLabels);
+
+const pointers = new Map();
+let pinchDist = 0;
+svg.addEventListener("pointerdown", e => {
+  pointers.set(e.pointerId, e);
+  if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    pinchDist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+  }
+  svg.setPointerCapture(e.pointerId);
+});
+svg.addEventListener("pointermove", e => {
+  if (!pointers.has(e.pointerId)) return;
+  const prev = pointers.get(e.pointerId);
+  pointers.set(e.pointerId, e);
+  const r = svg.getBoundingClientRect();
+  if (pointers.size === 1) {
+    const dx = (e.clientX - prev.clientX) / r.width * vb.w;
+    const dy = (e.clientY - prev.clientY) / r.height * vb.h;
+    if (dx || dy) { svg.classList.add("dragging"); vb.x -= dx; vb.y -= dy; applyVB(); }
+  } else if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    if (pinchDist > 0 && d > 0) {
+      const mx = (a.clientX + b.clientX) / 2, my = (a.clientY + b.clientY) / 2;
+      const cx = vb.x + (mx - r.left) / r.width * vb.w;
+      const cy = vb.y + (my - r.top) / r.height * vb.h;
+      zoomAt(cx, cy, pinchDist / d);
+      pinchDist = d;
+    }
+  }
+});
+["pointerup", "pointercancel"].forEach(ev => svg.addEventListener(ev, e => {
+  pointers.delete(e.pointerId);
+  if (pointers.size === 0) svg.classList.remove("dragging");
+  pinchDist = 0;
+}));
+
+// ---- 내보내기 / 가져오기 / 초기화 ----
+function pushAll(codes) {
+  return api("/api/visited", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ room: ROOM, codes })
+  });
+}
+$("exportBtn").onclick = () => {
+  const blob = new Blob([JSON.stringify({ visited: [...visited], exported: new Date().toISOString() }, null, 2)],
+    { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "my-travel-map.json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+$("importBtn").onclick = () => $("importFile").click();
+$("importFile").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  file.text().then(async t => {
+    try {
+      const data = JSON.parse(t);
+      const arr = Array.isArray(data) ? data : data.visited;
+      if (!Array.isArray(arr)) throw new Error();
+      visited = new Set(arr.map(String));
+      paths.forEach(p => p.classList.toggle("visited", visited.has(p.dataset.code)));
+      render(); updateLabels();
+      await pushAll([...visited]);
+      setBadge(true);
+    } catch { alert("파일 형식을 읽을 수 없습니다."); }
+    e.target.value = "";
+  });
+});
+$("resetBtn").onclick = async () => {
+  if (!confirm(`기록된 ${visited.size}개 지역을 모두 지울까요? (사진은 지워지지 않습니다)`)) return;
+  visited.clear();
+  paths.forEach(p => p.classList.remove("visited"));
+  render(); updateLabels();
+  if (selected) renderPanel();
+  try { await pushAll([]); setBadge(true); } catch { setBadge(false); }
+};
+
+// ---- 시작 ----
+const roomParam = new URLSearchParams(location.search).get("room");
+if (roomParam && /^[a-z0-9]{6,12}$/.test(roomParam)) enterRoom(roomParam);
+else showLanding();
+</script>
+</body>
+</html>
