@@ -633,7 +633,6 @@ function updateLabels() {
   provLabelsG.style.fontSize = (14 / pxPerUnit) + "px";
   const showMuni = vb.w <= 620;
   provLabelsG.style.display = showMuni ? "none" : "";
-  const r = 7 / pxPerUnit;          // 마크 반지름: 화면상 7px 고정
   const marks = [];
   muniTexts.forEach(t => {
     let labelShown = false;
@@ -647,13 +646,15 @@ function updateLabels() {
     }
     if (!visited.has(t.dataset.code)) return;
     const x = +t.getAttribute("x");
-    // 라벨이 보이면 이름 위에, 아니면 지역 중심에
-    const y = +t.getAttribute("y") - (labelShown ? 15 / pxPerUnit : 0);
+    // 핀 끝이 지역 중심을 가리킴. 라벨이 보이면 이름과 겹치지 않게 살짝 위로
+    const y = +t.getAttribute("y") - (labelShown ? 9 / pxPerUnit : 0);
+    const s = 1 / pxPerUnit;   // 화면픽셀 → SVG단위 (줌 무관 고정 크기)
     marks.push(
-      `<g transform="translate(${x} ${y})">` +
-      `<circle r="${r}" fill="#2d6a4f" stroke="#ffffff" stroke-width="${r * 0.22}"/>` +
-      `<path d="M ${-r * 0.42} ${r * 0.05} L ${-r * 0.08} ${r * 0.38} L ${r * 0.46} ${-r * 0.32}"` +
-      ` stroke="#ffffff" stroke-width="${r * 0.26}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>` +
+      `<g transform="translate(${x} ${y}) scale(${s})">` +
+      `<path d="M0 0C-4.5-6-8-9.2-8-13a8 8 0 1 1 16 0c0 3.8-3.5 7-8 13Z"` +
+      ` fill="#2d6a4f" stroke="#ffffff" stroke-width="1.5"/>` +
+      `<path d="M-3.2-14.5-0.8-12 3.4-16.2"` +
+      ` stroke="#ffffff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>` +
       `</g>`);
   });
   marksG.innerHTML = marks.join("");
