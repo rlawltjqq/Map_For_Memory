@@ -70,10 +70,10 @@
   #map.dragging { cursor: grabbing; }
   #municipalities path { transition: fill .15s; cursor: pointer; }
   #municipalities path:hover { fill: #cfe3f7; }
-  #municipalities path.visited { fill: #3b9c6e; }
-  #municipalities path.visited:hover { fill: #2f7d58; }
+  #municipalities path.visited { fill: #b7e4c7; }
+  #municipalities path.visited:hover { fill: #95d5b2; }
   #municipalities path.selected { stroke: #1d4ed8; stroke-width: 1.6; }
-  #muniLabels text.on-visited { fill: #fff; stroke: #1f5c3e; }
+  #muniLabels text.on-visited { fill: #1b4332; stroke: #ffffff; }
   .zoom-btns { position: absolute; right: 14px; bottom: 14px; display: flex; flex-direction: column; gap: 6px; }
   .zoom-btns button {
     width: 38px; height: 38px; border: 1px solid #d1d5db; background: #fff; border-radius: 8px;
@@ -1165,6 +1165,12 @@ function applyVB() {
   svg.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
   updateLabels();
 }
+// 방문 체크 마크 오버레이 (라벨 좌표 재사용)
+const marksG = document.createElementNS("http://www.w3.org/2000/svg", "g");
+marksG.id = "visitMarks";
+marksG.setAttribute("pointer-events", "none");
+svg.appendChild(marksG);
+
 function updateLabels() {
   const rect = svg.getBoundingClientRect();
   if (!rect.width) return;
@@ -1173,12 +1179,30 @@ function updateLabels() {
   provLabelsG.style.fontSize = (14 / pxPerUnit) + "px";
   const showMuni = vb.w <= 620;
   provLabelsG.style.display = showMuni ? "none" : "";
+  const r = 7 / pxPerUnit;          // 마크 반지름: 화면상 7px 고정
+  const marks = [];
   muniTexts.forEach(t => {
-    if (!showMuni) { t.style.display = "none"; return; }
-    const fits = parseFloat(t.dataset.w) * pxPerUnit > t.textContent.length * 11 + 8;
-    t.style.display = fits ? "" : "none";
-    t.classList.toggle("on-visited", visited.has(t.dataset.code));
+    let labelShown = false;
+    if (showMuni) {
+      const fits = parseFloat(t.dataset.w) * pxPerUnit > t.textContent.length * 11 + 8;
+      labelShown = fits;
+      t.style.display = fits ? "" : "none";
+      t.classList.toggle("on-visited", visited.has(t.dataset.code));
+    } else {
+      t.style.display = "none";
+    }
+    if (!visited.has(t.dataset.code)) return;
+    const x = +t.getAttribute("x");
+    // 라벨이 보이면 이름 위에, 아니면 지역 중심에
+    const y = +t.getAttribute("y") - (labelShown ? 15 / pxPerUnit : 0);
+    marks.push(
+      `<g transform="translate(${x} ${y})">` +
+      `<circle r="${r}" fill="#2d6a4f" stroke="#ffffff" stroke-width="${r * 0.22}"/>` +
+      `<path d="M ${-r * 0.42} ${r * 0.05} L ${-r * 0.08} ${r * 0.38} L ${r * 0.46} ${-r * 0.32}"` +
+      ` stroke="#ffffff" stroke-width="${r * 0.26}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>` +
+      `</g>`);
   });
+  marksG.innerHTML = marks.join("");
 }
 function zoomAt(cx, cy, factor) {
   const newW = Math.min(home.w * 2, Math.max(home.w / 20, vb.w * factor));
