@@ -628,11 +628,11 @@ function applyVB() {
   svg.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
   updateLabels();
 }
-// 방문 체크 마크 오버레이 (라벨 좌표 재사용)
+// 방문 마커 오버레이 (라벨 좌표 재사용) — 지역명이 위에 오도록 라벨 아래 레이어에 삽입
 const marksG = document.createElementNS("http://www.w3.org/2000/svg", "g");
 marksG.id = "visitMarks";
 marksG.setAttribute("pointer-events", "none");
-svg.appendChild(marksG);
+svg.insertBefore(marksG, svg.querySelector("#muniLabels"));
 
 function updateLabels() {
   const rect = svg.getBoundingClientRect();
@@ -655,22 +655,25 @@ function updateLabels() {
     }
     if (!visited.has(t.dataset.code)) return;
     const x = +t.getAttribute("x");
-    // 마커 끝이 지역 중심을 가리킴. 라벨이 보이면 이름과 겹치지 않게 살짝 위로
-    const y = +t.getAttribute("y") - (labelShown ? 9 / pxPerUnit : 0);
-    const s = 1 / pxPerUnit;   // 화면픽셀 → SVG단위 (줌 무관 고정 크기)
+    const y = +t.getAttribute("y");
     const emblem = EMBLEMS[t.dataset.code];
     if (emblem) {
-      // 지자체 공식 심벌마크를 흰 원 안에
+      // 지자체 심벌을 지역 안에 반투명하게 채움. 지역 크기에 맞추되 너무 작아지지 않게
+      const w = parseFloat(t.dataset.w);
+      const h = parseFloat(t.dataset.h) || w;
+      let size = Math.min(w, h) * 0.68;
+      size = Math.max(size, 22 / pxPerUnit);   // 최소 화면상 22px
+      size = Math.min(size, 110 / pxPerUnit);  // 최대 화면상 110px
+      const half = size / 2;
       marks.push(
-        `<g transform="translate(${x} ${y}) scale(${s})">` +
-        `<path d="M0 0 L-4.5 -8 L4.5 -8 Z" fill="#ffffff" stroke="#c8cdd4" stroke-width="1"/>` +
-        `<circle cy="-15" r="12" fill="#ffffff" stroke="#c8cdd4" stroke-width="1"/>` +
-        `<image href="${emblem}" x="-9.5" y="-24.5" width="19" height="19" preserveAspectRatio="xMidYMid meet"/>` +
-        `</g>`);
+        `<image href="${emblem}" x="${x - half}" y="${y - half}" width="${size}" height="${size}"` +
+        ` opacity="0.72" preserveAspectRatio="xMidYMid meet"/>`);
     } else {
-      // 휘장이 없는 지역은 체크 핀으로
+      // 휘장이 없는 지역은 체크 핀으로 (줌 무관 고정 크기)
+      const s = 1 / pxPerUnit;
+      const py = y - (labelShown ? 9 / pxPerUnit : 0);
       marks.push(
-        `<g transform="translate(${x} ${y}) scale(${s})">` +
+        `<g transform="translate(${x} ${py}) scale(${s})">` +
         `<path d="M0 0C-4.5-6-8-9.2-8-13a8 8 0 1 1 16 0c0 3.8-3.5 7-8 13Z"` +
         ` fill="#2d6a4f" stroke="#ffffff" stroke-width="1.5"/>` +
         `<path d="M-3.2-14.5-0.8-12 3.4-16.2"` +

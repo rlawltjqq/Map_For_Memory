@@ -123,12 +123,16 @@ def to_path(props, rings, with_fill_id=True):
 
 
 def label_of(props, rings, text):
-    # 가장 큰 링의 무게중심에 라벨, data-w = 그 링의 투영 폭 (라벨 표시 여부 판단용)
+    # 가장 큰 링의 무게중심에 라벨, data-w/h = 그 링의 투영 크기 (라벨·마커 크기 판단용)
     main = rings[0]
     cx, cy = tr(*ring_centroid(main))
-    xs = [tr(x, y)[0] for x, y in main]
+    pts = [tr(x, y) for x, y in main]
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
     w = round(max(xs) - min(xs), 1)
-    return f'  <text x="{cx}" y="{cy}" dy=".35em" data-w="{w}" data-code="{props["code"]}">{text}</text>'
+    h = round(max(ys) - min(ys), 1)
+    return (f'  <text x="{cx}" y="{cy}" dy=".35em" data-w="{w}" data-h="{h}" '
+            f'data-code="{props["code"]}">{text}</text>')
 
 
 muni_paths, muni_labels = [], []
