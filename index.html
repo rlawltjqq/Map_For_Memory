@@ -1211,8 +1211,14 @@ function updateLabels() {
       size = Math.max(size, 22 / pxPerUnit);   // 최소 화면상 22px
       size = Math.min(size, 110 / pxPerUnit);  // 최대 화면상 110px
       const half = size / 2;
+      // 지역명이 보이면 심벌을 이름 바로 위로 올려서 겹치지 않게 (심벌 + 아래 이름)
+      let cy = y;
+      if (labelShown) {
+        const fontSvg = 11 / pxPerUnit;
+        cy = y - fontSvg * 0.55 - 3 / pxPerUnit - half;
+      }
       marks.push(
-        `<image href="${emblem}" x="${x - half}" y="${y - half}" width="${size}" height="${size}"` +
+        `<image href="${emblem}" x="${x - half}" y="${cy - half}" width="${size}" height="${size}"` +
         ` opacity="0.72" preserveAspectRatio="xMidYMid meet"/>`);
     } else {
       // 휘장이 없는 지역은 체크 핀으로 (줌 무관 고정 크기)
