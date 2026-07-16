@@ -94,6 +94,10 @@
   #regionPanel { border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; background: #fafbfc; }
   #regionPanel .hint { font-size: 12.5px; color: #9ca3af; text-align: center; padding: 6px 0; }
   #rpHead { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  #rpEmblem {
+    width: 34px; height: 34px; object-fit: contain; display: none;
+    background: #fff; border: 1px solid #eef0f3; border-radius: 8px; padding: 2px;
+  }
   #rpName { font-size: 15px; font-weight: 700; }
   #rpProv { font-size: 12px; color: #6b7280; }
   #rpToggle {
@@ -255,6 +259,7 @@
         <div class="hint" id="rpHint">지도에서 지역을 클릭하면<br>사진을 추가할 수 있어요</div>
         <div id="rpBody" style="display:none">
           <div id="rpHead">
+            <img id="rpEmblem" alt="">
             <div><div id="rpName"></div><div id="rpProv"></div></div>
             <button id="rpToggle"></button>
             <button id="rpClose" title="닫기">✕</button>
@@ -296,6 +301,7 @@
 
 <script>
 const PROV = __PROV__;
+const EMBLEMS = __EMBLEMS__;   // 시·군·구 코드 → 공식 휘장(심벌) 이미지 URL
 const svg = document.getElementById("map");
 const paths = [...svg.querySelectorAll("#municipalities path")];
 const muniTexts = [...svg.querySelectorAll("#muniLabels text")];
@@ -493,6 +499,9 @@ function renderPanel() {
   $("rpBody").style.display = "";
   $("rpName").textContent = p.dataset.name;
   $("rpProv").textContent = PROV[selected.slice(0, 2)] || "";
+  const emblem = EMBLEMS[selected];
+  $("rpEmblem").style.display = emblem ? "" : "none";
+  if (emblem) $("rpEmblem").src = emblem;
   const v = visited.has(selected);
   const t = $("rpToggle");
   t.textContent = v ? "✓ 방문함" : "방문 표시";
@@ -646,16 +655,28 @@ function updateLabels() {
     }
     if (!visited.has(t.dataset.code)) return;
     const x = +t.getAttribute("x");
-    // 핀 끝이 지역 중심을 가리킴. 라벨이 보이면 이름과 겹치지 않게 살짝 위로
+    // 마커 끝이 지역 중심을 가리킴. 라벨이 보이면 이름과 겹치지 않게 살짝 위로
     const y = +t.getAttribute("y") - (labelShown ? 9 / pxPerUnit : 0);
     const s = 1 / pxPerUnit;   // 화면픽셀 → SVG단위 (줌 무관 고정 크기)
-    marks.push(
-      `<g transform="translate(${x} ${y}) scale(${s})">` +
-      `<path d="M0 0C-4.5-6-8-9.2-8-13a8 8 0 1 1 16 0c0 3.8-3.5 7-8 13Z"` +
-      ` fill="#2d6a4f" stroke="#ffffff" stroke-width="1.5"/>` +
-      `<path d="M-3.2-14.5-0.8-12 3.4-16.2"` +
-      ` stroke="#ffffff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>` +
-      `</g>`);
+    const emblem = EMBLEMS[t.dataset.code];
+    if (emblem) {
+      // 지자체 공식 심벌마크를 흰 원 안에
+      marks.push(
+        `<g transform="translate(${x} ${y}) scale(${s})">` +
+        `<path d="M0 0 L-4.5 -8 L4.5 -8 Z" fill="#ffffff" stroke="#c8cdd4" stroke-width="1"/>` +
+        `<circle cy="-15" r="12" fill="#ffffff" stroke="#c8cdd4" stroke-width="1"/>` +
+        `<image href="${emblem}" x="-9.5" y="-24.5" width="19" height="19" preserveAspectRatio="xMidYMid meet"/>` +
+        `</g>`);
+    } else {
+      // 휘장이 없는 지역은 체크 핀으로
+      marks.push(
+        `<g transform="translate(${x} ${y}) scale(${s})">` +
+        `<path d="M0 0C-4.5-6-8-9.2-8-13a8 8 0 1 1 16 0c0 3.8-3.5 7-8 13Z"` +
+        ` fill="#2d6a4f" stroke="#ffffff" stroke-width="1.5"/>` +
+        `<path d="M-3.2-14.5-0.8-12 3.4-16.2"` +
+        ` stroke="#ffffff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>` +
+        `</g>`);
+    }
   });
   marksG.innerHTML = marks.join("");
 }

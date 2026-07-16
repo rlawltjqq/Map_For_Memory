@@ -26,7 +26,14 @@ prov_short = {code: short.get(name, name) for code, name in prov_names.items()}
 with open("page_template.html", encoding="utf-8") as f:
     html = f.read()
 
+try:
+    with open("emblems.json", encoding="utf-8") as f:
+        emblems = json.load(f)
+except FileNotFoundError:
+    emblems = {}
+
 html = html.replace("__PROV__", json.dumps(prov_short, ensure_ascii=False))
+html = html.replace("__EMBLEMS__", json.dumps(emblems, ensure_ascii=False))
 html = html.replace("__SVG__", svg)
 
 with open("index.html", "w", encoding="utf-8") as f:
