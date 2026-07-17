@@ -48,12 +48,12 @@
     display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   }
   header h1 { font-size: 17px; }
-  #roomName { font-size: 14px; font-weight: 600; color: #3b9c6e; }
+  #roomName { font-size: 15px; font-weight: 700; color: #1f2937; }
   header .hbtn {
-    font-size: 12px; padding: 5px 10px; border-radius: 999px; cursor: pointer;
-    border: 1px solid #d1d5db; background: #fff; color: #374151;
+    font-size: 12px; padding: 5px 11px; border-radius: 999px; cursor: pointer;
+    border: 1px solid #e2e8f0; background: #fff; color: #475569;
   }
-  header .hbtn:hover { background: #f3f4f6; }
+  header .hbtn:hover { background: #f1f5f9; border-color: #cbd5e1; }
   #syncBadge { font-size: 12px; padding: 3px 10px; border-radius: 999px; margin-left: auto; }
   #syncBadge::before {
     content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%;
@@ -69,10 +69,10 @@
   #map { width: 100%; height: 100%; display: block; cursor: grab; }
   #map.dragging { cursor: grabbing; }
   #municipalities path { transition: fill .15s; cursor: pointer; }
-  #municipalities path:hover { fill: #cfe3f7; }
+  #municipalities path:hover { fill: #e3f2e9; }
   #municipalities path.visited { fill: #b7e4c7; }
-  #municipalities path.visited:hover { fill: #95d5b2; }
-  #municipalities path.selected { stroke: #1d4ed8; stroke-width: 1.6; }
+  #municipalities path.visited:hover { fill: #a4dcb8; }
+  #municipalities path.selected { stroke: #2d6a4f; stroke-width: 1.5; }
   #muniLabels text.on-visited { fill: #1b4332; stroke: #ffffff; }
   .zoom-btns { position: absolute; right: 14px; bottom: 14px; display: flex; flex-direction: column; gap: 6px; }
   .zoom-btns button {
@@ -130,9 +130,9 @@
   .btns { display: flex; gap: 8px; margin-top: 16px; }
   .btns button {
     flex: 1; padding: 8px 0; font-size: 13px; border-radius: 8px; cursor: pointer;
-    border: 1px solid #d1d5db; background: #fff; color: #374151;
+    border: 1px solid #e2e8f0; background: #fff; color: #475569;
   }
-  .btns button:hover { background: #f3f4f6; }
+  .btns button:hover { background: #f1f5f9; border-color: #cbd5e1; }
   .btns #resetBtn { color: #b91c1c; border-color: #fecaca; }
   .btns #resetBtn:hover { background: #fef2f2; }
   #tooltip {
@@ -639,7 +639,7 @@ function updateLabels() {
   if (!rect.width) return;
   const pxPerUnit = rect.width / vb.w;
   svg.querySelector("#muniLabels").style.fontSize = (11 / pxPerUnit) + "px";
-  provLabelsG.style.fontSize = (14 / pxPerUnit) + "px";
+  provLabelsG.style.fontSize = (13 / pxPerUnit) + "px";
   const showMuni = vb.w <= 620;
   provLabelsG.style.display = showMuni ? "none" : "";
   const marks = [];
@@ -664,6 +664,7 @@ function updateLabels() {
       let size = Math.min(w, h) * 0.68;
       size = Math.max(size, 22 / pxPerUnit);   // 최소 화면상 22px
       size = Math.min(size, 110 / pxPerUnit);  // 최대 화면상 110px
+      size = Math.min(size, Math.min(w, h) * 1.05);  // 작은 지역에선 지역 밖으로 넘치지 않게
       const half = size / 2;
       // 지역명이 보이면 심벌을 이름 바로 위로 올려서 겹치지 않게 (심벌 + 아래 이름)
       let cy = y;
