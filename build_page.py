@@ -26,11 +26,19 @@ prov_short = {code: short.get(name, name) for code, name in prov_names.items()}
 with open("page_template.html", encoding="utf-8") as f:
     html = f.read()
 
+import os
+
 try:
     with open("emblems.json", encoding="utf-8") as f:
         emblems = json.load(f)
 except FileNotFoundError:
     emblems = {}
+
+# 흰 배경을 제거해 둔 로컬 PNG가 있으면 그쪽을 우선 사용 (없으면 원격 URL 유지)
+emblems = {
+    code: (f"emblems/{code}.png" if os.path.exists(f"emblems/{code}.png") else url)
+    for code, url in emblems.items()
+}
 
 html = html.replace("__PROV__", json.dumps(prov_short, ensure_ascii=False))
 html = html.replace("__EMBLEMS__", json.dumps(emblems, ensure_ascii=False))
