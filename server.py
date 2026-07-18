@@ -111,7 +111,8 @@ class Handler(SimpleHTTPRequestHandler):
                     return
                 self.send_json({"name": meta["name"],
                                 "visited": meta.get("visited", []),
-                                "photos": meta.get("photos", {})})
+                                "photos": meta.get("photos", {}),
+                                "notes": meta.get("notes", {})})
             return
         super().do_GET()
 
@@ -136,7 +137,7 @@ class Handler(SimpleHTTPRequestHandler):
                 rooms = load_rooms()
                 rooms[room_id] = {"name": name, "salt": salt, "pwhash": pwhash,
                                   "created": int(time.time() * 1000),
-                                  "visited": [], "photos": {}}
+                                  "visited": [], "photos": {}, "notes": {}}
                 save_rooms(rooms)
             self.send_json({"id": room_id, "name": name, "token": token_of(room_id, pwhash)})
             return
@@ -179,6 +180,30 @@ class Handler(SimpleHTTPRequestHandler):
                 else:
                     self.send_json({"error": "bad request"}, 400)
                     return
+                save_rooms(rooms)
+            self.send_json({"ok": True})
+            return
+
+        if url.path == "/api/note":
+            body = self.read_json()
+            room_id = body.get("room") or ""
+            code = str(body.get("code") or "")
+            with _lock:
+                rooms = load_rooms()
+                meta = self.auth(rooms, room_id)
+                if not meta:
+                    self.send_json({"error": "unauthorized"}, 403)
+                    return
+                if not re.fullmatch(r"\d+", code):
+                    self.send_json({"error": "bad code"}, 400)
+                    return
+                d = (body.get("date") or "")[:10]
+                m = (body.get("memo") or "")[:500]
+                notes = meta.setdefault("notes", {})
+                if not d and not m:
+                    notes.pop(code, None)
+                else:
+                    notes[code] = {"date": d, "memo": m}
                 save_rooms(rooms)
             self.send_json({"ok": True})
             return
