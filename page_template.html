@@ -633,6 +633,13 @@ const marksG = document.createElementNS("http://www.w3.org/2000/svg", "g");
 marksG.id = "visitMarks";
 marksG.setAttribute("pointer-events", "none");
 svg.insertBefore(marksG, svg.querySelector("#muniLabels"));
+const pathByCode = {};
+paths.forEach(p => { pathByCode[p.dataset.code] = p; });
+const bboxCache = {};
+function regionBBox(code) {
+  if (!bboxCache[code] && pathByCode[code]) bboxCache[code] = pathByCode[code].getBBox();
+  return bboxCache[code];
+}
 
 function updateLabels() {
   const rect = svg.getBoundingClientRect();
@@ -661,19 +668,31 @@ function updateLabels() {
       // 지자체 심벌을 지역 안에 반투명하게 채움. 지역 크기에 맞추되 너무 작아지지 않게
       const w = parseFloat(t.dataset.w);
       const h = parseFloat(t.dataset.h) || w;
-      let size = Math.min(w, h) * 0.68;
-      size = Math.max(size, 22 / pxPerUnit);   // 최소 화면상 22px
-      size = Math.min(size, 110 / pxPerUnit);  // 최대 화면상 110px
-      size = Math.min(size, Math.min(w, h) * 1.05);  // 작은 지역에선 지역 밖으로 넘치지 않게
+      // 심벌이 지역 경계를 넘지 않도록 지역 크기 안에 가둔다.
+      const fontSvg = 11 / pxPerUnit;
+      const availW = w * 0.86;
+      // 라벨이 보이면 심벌은 이름 위쪽 공간에만 (지역 위 경계 ~ 라벨 위끝),
+      // 안 보이면 지역 중심에 크게.
+      const availH = labelShown
+        ? Math.max(0, h / 2 - fontSvg * 0.6 - 2 / pxPerUnit)
+        : h * 0.82;
+      let size = Math.min(w, h) * 0.6;
+      size = Math.min(size, availW, availH, 96 / pxPerUnit);
+      size = Math.max(size, 12 / pxPerUnit);          // 너무 작지 않게
+      size = Math.min(size, availW, availH);          // 단, 지역을 넘지는 않게 최종 캡
       const half = size / 2;
-      // 지역명이 보이면 심벌을 이름 바로 위로 올려서 겹치지 않게 (심벌 + 아래 이름)
-      let cy = y;
-      if (labelShown) {
-        const fontSvg = 11 / pxPerUnit;
-        cy = y - fontSvg * 0.55 - 3 / pxPerUnit - half;
+      let cx = x;
+      let cy = labelShown ? (y - fontSvg * 0.5 - 2 / pxPerUnit - half) : y;
+      // 심벌 상자를 지역 bbox 안으로 강제 클램프 (경계 밖으로 삐져나오지 않게)
+      const bb = regionBBox(t.dataset.code);
+      if (bb) {
+        if (bb.width > size) cx = Math.min(Math.max(cx, bb.x + half), bb.x + bb.width - half);
+        else cx = bb.x + bb.width / 2;
+        if (bb.height > size) cy = Math.min(Math.max(cy, bb.y + half), bb.y + bb.height - half);
+        else cy = bb.y + bb.height / 2;
       }
       marks.push(
-        `<image href="${emblem}" x="${x - half}" y="${cy - half}" width="${size}" height="${size}"` +
+        `<image href="${emblem}" x="${cx - half}" y="${cy - half}" width="${size}" height="${size}"` +
         ` opacity="0.72" preserveAspectRatio="xMidYMid meet"/>`);
     } else {
       // 휘장이 없는 지역은 체크 핀으로 (줌 무관 고정 크기)
