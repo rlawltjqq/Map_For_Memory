@@ -1059,7 +1059,7 @@ function layoutMode() {
   if (mq.matches) {
     document.body.appendChild(regionPanelEl);   // 바텀시트로 이동
   } else {
-    asideEl.insertBefore(regionPanelEl, $("statsHead"));  // 사이드바로 복귀
+    asideEl.insertBefore(regionPanelEl, $("feedHead"));  // 사이드바 상단(앨범 위)으로 복귀
     regionPanelEl.classList.remove("open");
     setTab("map");
   }
