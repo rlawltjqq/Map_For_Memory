@@ -137,8 +137,9 @@
   }
   .mem-card {
     border: 1px solid #eef0f3; border-radius: 12px; padding: 11px 12px; margin-bottom: 10px;
-    background: #fafbfc;
+    background: #fafbfc; cursor: pointer; transition: background .12s, border-color .12s;
   }
+  .mem-card:hover { background: #f1f7f3; border-color: #cde6d8; }
   .mem-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
   .mem-head img { width: 26px; height: 26px; object-fit: contain; }
   .mem-title { font-size: 13.5px; font-weight: 700; color: #1f2937; }
@@ -320,11 +321,8 @@
       <h2 id="statsHead">시·도별 달성률</h2>
       <div id="provList"></div>
       <div class="btns">
-        <button id="exportBtn">내보내기</button>
-        <button id="importBtn">가져오기</button>
-        <button id="resetBtn">초기화</button>
+        <button id="resetBtn">전체 초기화</button>
       </div>
-      <input type="file" id="importFile" accept=".json" style="display:none">
     </aside>
   </div>
   <nav id="tabbar">
@@ -619,6 +617,7 @@ function renderFeed() {
   const entries = [];
   const codes = new Set([...Object.keys(notes), ...Object.keys(photos)]);
   codes.forEach(code => {
+    if (!nameByCode[code]) return;   // 지도에 없는 코드는 건너뜀
     const note = notes[code] || {};
     const ph = photos[code] || [];
     if (!note.date && !note.memo && ph.length === 0) return;
@@ -635,7 +634,7 @@ function renderFeed() {
       ? `<div class="mem-photos">${e.photos.map(p =>
           `<img src="${p.url}" loading="lazy" data-full="${p.url}">`).join("")}</div>`
       : "";
-    return `<div class="mem-card">
+    return `<div class="mem-card" data-code="${e.code}">
       <div class="mem-head">
         ${emblem ? `<img src="${emblem}" alt="">` : ""}
         <div><div class="mem-title">${name}</div><div class="mem-prov">${prov}</div></div>
@@ -643,10 +642,14 @@ function renderFeed() {
       </div>${memoHtml}${photosHtml}</div>`;
   }).join("");
   feed.querySelectorAll("img[data-full]").forEach(img => {
-    img.onclick = () => {
+    img.onclick = (ev) => {
+      ev.stopPropagation();   // 사진 클릭은 확대 (지역 이동 아님)
       $("lightbox").style.display = "flex";
       $("lightbox").querySelector("img").src = img.dataset.full;
     };
+  });
+  feed.querySelectorAll(".mem-card").forEach(card => {
+    card.onclick = () => focusRegion(card.dataset.code);
   });
 }
 function escapeHtml(s) {
@@ -776,8 +779,29 @@ const pathByCode = {};
 paths.forEach(p => { pathByCode[p.dataset.code] = p; });
 const bboxCache = {};
 function regionBBox(code) {
-  if (!bboxCache[code] && pathByCode[code]) bboxCache[code] = pathByCode[code].getBBox();
+  // 숨겨진 상태(getBBox=0)는 캐시하지 않아 나중에 다시 정확히 측정
+  if ((!bboxCache[code] || !bboxCache[code].width) && pathByCode[code]) {
+    const bb = pathByCode[code].getBBox();
+    if (bb.width) bboxCache[code] = bb;
+    else return bb;
+  }
   return bboxCache[code];
+}
+// 앨범 카드 → 해당 지역으로 지도 이동 + 선택
+function focusRegion(code) {
+  setTab("map");
+  const bb = regionBBox(code);
+  if (bb && bb.width) {
+    const cx = bb.x + bb.width / 2, cy = bb.y + bb.height / 2;
+    const ar = home.w / home.h;
+    // 지역이 화면의 약 45%를 차지하도록 여백 포함 크기 계산
+    let w = Math.max(bb.width, bb.height * ar) / 0.45;
+    w = Math.min(Math.max(w, home.w / 18), home.w);
+    let h = w / ar;
+    vb = { x: cx - w / 2, y: cy - h / 2, w, h };
+    applyVB();
+  }
+  select(code);
 }
 
 function updateLabels() {
@@ -915,35 +939,8 @@ function pushAll(codes) {
     body: JSON.stringify({ room: ROOM, codes })
   });
 }
-$("exportBtn").onclick = () => {
-  const blob = new Blob([JSON.stringify({ visited: [...visited], exported: new Date().toISOString() }, null, 2)],
-    { type: "application/json" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = "my-travel-map.json";
-  a.click();
-  URL.revokeObjectURL(a.href);
-};
-$("importBtn").onclick = () => $("importFile").click();
-$("importFile").addEventListener("change", e => {
-  const file = e.target.files[0];
-  if (!file) return;
-  file.text().then(async t => {
-    try {
-      const data = JSON.parse(t);
-      const arr = Array.isArray(data) ? data : data.visited;
-      if (!Array.isArray(arr)) throw new Error();
-      visited = new Set(arr.map(String));
-      paths.forEach(p => p.classList.toggle("visited", visited.has(p.dataset.code)));
-      render(); updateLabels();
-      await pushAll([...visited]);
-      setBadge(true);
-    } catch { alert("파일 형식을 읽을 수 없습니다."); }
-    e.target.value = "";
-  });
-});
 $("resetBtn").onclick = async () => {
-  if (!confirm(`기록된 ${visited.size}개 지역을 모두 지울까요? (사진은 지워지지 않습니다)`)) return;
+  if (!confirm(`방문 표시 ${visited.size}곳을 모두 지울까요?\n(사진·메모는 지워지지 않습니다. 함께 쓰는 지도라면 모두에게 적용됩니다.)`)) return;
   visited.clear();
   paths.forEach(p => p.classList.remove("visited"));
   render(); updateLabels();
