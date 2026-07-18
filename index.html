@@ -1098,7 +1098,7 @@ function renderPanel() {
   $("rpName").textContent = p.dataset.name;
   $("rpProv").textContent = PROV[selected.slice(0, 2)] || "";
   const emblem = EMBLEMS[selected];
-  $("rpEmblem").style.display = emblem ? "" : "none";
+  $("rpEmblem").style.display = emblem ? "block" : "none";
   if (emblem) $("rpEmblem").src = emblem;
   const v = visited.has(selected);
   const t = $("rpToggle");
