@@ -586,10 +586,12 @@ async function buildMapImage() {
   ctx.fillText($("roomName").textContent || "나의 여행 지도", 40, 58);
   ctx.fillStyle = "#3b9c6e";
   ctx.font = "700 26px 'Malgun Gothic',sans-serif";
-  ctx.fillText(`${pct}%`, 40, 100);
+  const pctStr = `${pct}%`;
+  ctx.fillText(pctStr, 40, 100);
+  const pctW = ctx.measureText(pctStr).width;
   ctx.fillStyle = "#6b7280";
   ctx.font = "400 18px 'Malgun Gothic',sans-serif";
-  ctx.fillText(`${n} / ${paths.length} 시·군·구 방문`, 100, 100);
+  ctx.fillText(`${n} / ${paths.length} 시·군·구 방문`, 40 + pctW + 12, 100);
   ctx.textAlign = "right";
   ctx.fillStyle = "#9ca3af";
   ctx.font = "400 15px 'Malgun Gothic',sans-serif";
