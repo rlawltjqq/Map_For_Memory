@@ -4,12 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>나의 여행 지도</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+    font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
     background: #f4f6f9; color: #1f2937; height: 100vh; height: 100dvh;
     display: flex; flex-direction: column;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.01em;
   }
   button { font-family: inherit; }
   input { font-family: inherit; }
@@ -537,6 +541,7 @@ async function toDataURL(url) {
 
 async function buildMapImage() {
   const W = 800, H = 1100, HEADER = 132, DPR = 2;
+  try { await document.fonts.ready; } catch {}   // 폰트 로드 후 렌더 (헤더 텍스트용)
   // 1) 지도 SVG 복제 (전국 뷰) + 방문 색 인라인 + 심벌 data URI
   const clone = svg.cloneNode(true);
   clone.setAttribute("viewBox", `0 0 ${W} ${H}`);
@@ -586,20 +591,20 @@ async function buildMapImage() {
   // 헤더 텍스트
   const n = visited.size, pct = Math.round(n / paths.length * 1000) / 10;
   ctx.fillStyle = "#1f2937";
-  ctx.font = "700 34px 'Malgun Gothic','Apple SD Gothic Neo',sans-serif";
+  ctx.font = "700 34px 'Pretendard Variable',Pretendard,'Pretendard Variable',Pretendard,'Malgun Gothic',sans-serif";
   ctx.textBaseline = "alphabetic";
   ctx.fillText($("roomName").textContent || "나의 여행 지도", 40, 58);
   ctx.fillStyle = "#3b9c6e";
-  ctx.font = "700 26px 'Malgun Gothic',sans-serif";
+  ctx.font = "700 26px 'Pretendard Variable',Pretendard,'Malgun Gothic',sans-serif";
   const pctStr = `${pct}%`;
   ctx.fillText(pctStr, 40, 100);
   const pctW = ctx.measureText(pctStr).width;
   ctx.fillStyle = "#6b7280";
-  ctx.font = "400 18px 'Malgun Gothic',sans-serif";
+  ctx.font = "400 18px 'Pretendard Variable',Pretendard,'Malgun Gothic',sans-serif";
   ctx.fillText(`${n} / ${paths.length} 시·군·구 방문`, 40 + pctW + 12, 100);
   ctx.textAlign = "right";
   ctx.fillStyle = "#9ca3af";
-  ctx.font = "400 15px 'Malgun Gothic',sans-serif";
+  ctx.font = "400 15px 'Pretendard Variable',Pretendard,'Malgun Gothic',sans-serif";
   ctx.fillText("map-for-memory", W - 40, 100);
   ctx.textAlign = "left";
   ctx.strokeStyle = "#eef0f3"; ctx.lineWidth = 1;
