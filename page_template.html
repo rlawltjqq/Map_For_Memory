@@ -54,6 +54,28 @@
     border: 1px solid #e2e8f0; background: #fff; color: #475569;
   }
   header .hbtn:hover { background: #f1f5f9; border-color: #cbd5e1; }
+  #searchWrap { position: relative; margin-left: 8px; }
+  #searchWrap .search-ic { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; pointer-events: none; }
+  #searchInput {
+    width: 190px; font-size: 13px; padding: 6px 10px 6px 28px; border: 1px solid #e2e8f0;
+    border-radius: 999px; color: #374151; background: #fff;
+  }
+  #searchInput:focus { outline: none; border-color: #3b9c6e; width: 220px; }
+  #searchResults {
+    position: absolute; left: 0; top: calc(100% + 5px); width: 260px; max-height: 320px;
+    overflow-y: auto; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(0,0,0,.1); z-index: 20; display: none; padding: 4px;
+  }
+  #searchResults.show { display: block; }
+  .sr-item {
+    display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 7px;
+    cursor: pointer; font-size: 13px;
+  }
+  .sr-item.active, .sr-item:hover { background: #f1f7f3; }
+  .sr-item img { width: 20px; height: 20px; object-fit: contain; flex-shrink: 0; }
+  .sr-item .sr-prov { color: #9ca3af; font-size: 11.5px; margin-left: auto; }
+  .sr-item .sr-visited { color: #3b9c6e; font-size: 11px; }
+  #searchResults .sr-empty { padding: 10px; text-align: center; color: #9ca3af; font-size: 12.5px; }
   #syncBadge { font-size: 12px; padding: 3px 10px; border-radius: 999px; margin-left: auto; }
   #syncBadge::before {
     content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%;
@@ -212,6 +234,16 @@
   #rpClose { display: none; }
   @media (max-width: 720px) {
     aside { display: none; }
+    /* 모바일 헤더: 검색을 둘째 줄 전체 폭으로 */
+    #roomName { order: 1; }
+    #inviteBtn { order: 2; }
+    #saveBtn { order: 3; }
+    #leaveBtn { order: 4; }
+    #syncBadge { order: 5; }
+    #searchWrap { order: 6; margin-left: 0; width: 100%; flex-basis: 100%; }
+    #searchInput, #searchInput:focus { width: 100%; }
+    #searchResults { width: 100%; }
+    header .hbtn { font-size: 11.5px; padding: 4px 9px; }
     body.tab-stats .map-wrap { display: none; }
     body.tab-stats aside {
       display: block; width: 100%; max-height: none; flex: 1; border-left: none;
@@ -274,7 +306,13 @@
   <header>
     <h1><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="#3b9c6e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6 9 4Z"/><path d="M9 4v14"/><path d="M15 6v14"/></svg></h1>
     <span id="roomName"></span>
+    <div id="searchWrap">
+      <svg class="icon search-ic" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="searchInput" type="text" placeholder="지역 검색 (예: 경주)" autocomplete="off">
+      <div id="searchResults"></div>
+    </div>
     <button class="hbtn" id="inviteBtn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 13.5a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1.2 1.2"/><path d="M13.5 10.5a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1.2-1.2"/></svg> 초대 링크 복사</button>
+    <button class="hbtn" id="saveBtn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg> 지도 저장</button>
     <button class="hbtn" id="leaveBtn">지도 목록</button>
     <span id="syncBadge" class="on"></span>
   </header>
@@ -477,6 +515,115 @@ $("inviteBtn").onclick = async () => {
   setTimeout(() => { $("inviteBtn").innerHTML = inviteBtnHtml; }, 1500);
 };
 $("leaveBtn").onclick = () => { location.href = "/"; };
+
+// ---- 지도 이미지 저장 / 공유 ----
+const emblemDataCache = {};
+async function toDataURL(url) {
+  if (emblemDataCache[url]) return emblemDataCache[url];
+  const blob = await (await fetch(url)).blob();
+  const data = await new Promise(res => {
+    const fr = new FileReader();
+    fr.onload = () => res(fr.result);
+    fr.readAsDataURL(blob);
+  });
+  emblemDataCache[url] = data;
+  return data;
+}
+
+async function buildMapImage() {
+  const W = 800, H = 1100, HEADER = 132, DPR = 2;
+  // 1) 지도 SVG 복제 (전국 뷰) + 방문 색 인라인 + 심벌 data URI
+  const clone = svg.cloneNode(true);
+  clone.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  clone.removeAttribute("id");
+  clone.querySelectorAll("#municipalities path").forEach(p => {
+    p.classList.remove("visited", "selected");
+    p.setAttribute("fill", visited.has(p.dataset.code) ? "#b7e4c7" : "#ffffff");
+    p.setAttribute("stroke", "#c6cfd9");
+    p.setAttribute("stroke-width", "0.55");
+  });
+  // 라벨은 전국 뷰에서 겹치므로 제거, 마커만 다시 그림
+  const cLabels = clone.querySelector("#muniLabels"); if (cLabels) cLabels.remove();
+  const cMarks = clone.querySelector("#visitMarks"); if (cMarks) cMarks.remove();
+  // 방문 심벌을 지역 중심에 data URI로 배치
+  const markG = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  for (const p of paths) {
+    if (!visited.has(p.dataset.code)) continue;
+    const bb = p.getBBox();
+    const em = EMBLEMS[p.dataset.code];
+    const size = Math.min(Math.min(bb.width, bb.height) * 0.9, 26);
+    const cx = bb.x + bb.width / 2, cy = bb.y + bb.height / 2;
+    if (em) {
+      const data = await toDataURL(em);
+      const img = document.createElementNS("http://www.w3.org/2000/svg", "image");
+      img.setAttributeNS("http://www.w3.org/1999/xlink", "href", data);
+      img.setAttribute("href", data);
+      img.setAttribute("x", cx - size / 2); img.setAttribute("y", cy - size / 2);
+      img.setAttribute("width", size); img.setAttribute("height", size);
+      img.setAttribute("preserveAspectRatio", "xMidYMid meet");
+      markG.appendChild(img);
+    }
+  }
+  clone.appendChild(markG);
+  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  const svgStr = new XMLSerializer().serializeToString(clone);
+  const svgImg = new Image();
+  await new Promise((res, rej) => {
+    svgImg.onload = res; svgImg.onerror = rej;
+    svgImg.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgStr);
+  });
+  // 2) 캔버스에 헤더 + 지도
+  const canvas = document.createElement("canvas");
+  canvas.width = W * DPR; canvas.height = (H + HEADER) * DPR;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(DPR, DPR);
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H + HEADER);
+  // 헤더 텍스트
+  const n = visited.size, pct = Math.round(n / paths.length * 1000) / 10;
+  ctx.fillStyle = "#1f2937";
+  ctx.font = "700 34px 'Malgun Gothic','Apple SD Gothic Neo',sans-serif";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText($("roomName").textContent || "나의 여행 지도", 40, 58);
+  ctx.fillStyle = "#3b9c6e";
+  ctx.font = "700 26px 'Malgun Gothic',sans-serif";
+  ctx.fillText(`${pct}%`, 40, 100);
+  ctx.fillStyle = "#6b7280";
+  ctx.font = "400 18px 'Malgun Gothic',sans-serif";
+  ctx.fillText(`${n} / ${paths.length} 시·군·구 방문`, 100, 100);
+  ctx.textAlign = "right";
+  ctx.fillStyle = "#9ca3af";
+  ctx.font = "400 15px 'Malgun Gothic',sans-serif";
+  ctx.fillText("map-for-memory", W - 40, 100);
+  ctx.textAlign = "left";
+  ctx.strokeStyle = "#eef0f3"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(40, HEADER - 12); ctx.lineTo(W - 40, HEADER - 12); ctx.stroke();
+  ctx.drawImage(svgImg, 0, HEADER, W, H);
+  return await new Promise(res => canvas.toBlob(res, "image/png"));
+}
+
+$("saveBtn").onclick = async () => {
+  const btn = $("saveBtn");
+  const orig = btn.innerHTML;
+  btn.textContent = "만드는 중…"; btn.disabled = true;
+  try {
+    const blob = await buildMapImage();
+    const fname = `${($("roomName").textContent || "여행지도").replace(/[\\/:*?"<>|]/g, "")}.png`;
+    const file = new File([blob], fname, { type: "image/png" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: $("roomName").textContent });
+    } else {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = fname;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+  } catch (e) {
+    if (e && e.name !== "AbortError") alert("이미지를 만들지 못했어요. 다시 시도해 주세요.");
+  } finally {
+    btn.innerHTML = orig; btn.disabled = false;
+  }
+};
 
 // ---- 클릭: 방문 토글 + 지역 선택 ----
 let downPos = null;
@@ -803,6 +950,78 @@ function focusRegion(code) {
   }
   select(code);
 }
+
+// ---- 지역 검색 ----
+const searchIndex = paths.map(p => ({
+  code: p.dataset.code,
+  name: p.dataset.name,
+  prov: PROV[p.dataset.code.slice(0, 2)] || ""
+}));
+const searchInput = $("searchInput");
+const searchResults = $("searchResults");
+let srActive = -1, srItems = [];
+
+function runSearch(q) {
+  q = q.trim();
+  if (!q) { closeSearch(); return; }
+  const scored = [];
+  for (const r of searchIndex) {
+    const full = r.prov + " " + r.name;
+    let score = -1;
+    if (r.name.startsWith(q)) score = 0;
+    else if (r.name.includes(q)) score = 1;
+    else if (full.includes(q)) score = 2;
+    if (score >= 0) scored.push({ ...r, score });
+  }
+  scored.sort((a, b) => a.score - b.score || a.name.localeCompare(b.name));
+  srItems = scored.slice(0, 12);
+  srActive = srItems.length ? 0 : -1;
+  if (!srItems.length) {
+    searchResults.innerHTML = `<div class="sr-empty">"${escapeHtml(q)}" 검색 결과가 없어요</div>`;
+  } else {
+    searchResults.innerHTML = srItems.map((r, i) => {
+      const em = EMBLEMS[r.code];
+      const vis = visited.has(r.code) ? `<span class="sr-visited">✓</span>` : "";
+      return `<div class="sr-item${i === srActive ? " active" : ""}" data-code="${r.code}" data-i="${i}">
+        ${em ? `<img src="${em}" alt="">` : ""}
+        <span>${escapeHtml(r.name)}</span> ${vis}
+        <span class="sr-prov">${r.prov}</span>
+      </div>`;
+    }).join("");
+    searchResults.querySelectorAll(".sr-item").forEach(el => {
+      el.onmousedown = (e) => { e.preventDefault(); pickSearch(el.dataset.code); };
+      el.onmouseenter = () => { srActive = +el.dataset.i; highlightSR(); };
+    });
+  }
+  searchResults.classList.add("show");
+}
+function highlightSR() {
+  searchResults.querySelectorAll(".sr-item").forEach((el, i) =>
+    el.classList.toggle("active", i === srActive));
+}
+function pickSearch(code) {
+  focusRegion(code);
+  searchInput.value = "";
+  closeSearch();
+  searchInput.blur();
+}
+function closeSearch() {
+  searchResults.classList.remove("show");
+  searchResults.innerHTML = "";
+  srItems = []; srActive = -1;
+}
+searchInput.addEventListener("input", () => runSearch(searchInput.value));
+searchInput.addEventListener("focus", () => { if (searchInput.value.trim()) runSearch(searchInput.value); });
+searchInput.addEventListener("keydown", (e) => {
+  if (!srItems.length && e.key !== "Escape") return;
+  if (e.key === "ArrowDown") { e.preventDefault(); srActive = Math.min(srActive + 1, srItems.length - 1); highlightSR(); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); srActive = Math.max(srActive - 1, 0); highlightSR(); }
+  else if (e.key === "Enter") { e.preventDefault(); if (srItems[srActive]) pickSearch(srItems[srActive].code); }
+  else if (e.key === "Escape") { closeSearch(); searchInput.blur(); }
+});
+document.addEventListener("click", (e) => {
+  if (!$("searchWrap").contains(e.target)) closeSearch();
+});
 
 function updateLabels() {
   const rect = svg.getBoundingClientRect();
