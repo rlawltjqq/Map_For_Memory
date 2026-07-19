@@ -156,10 +156,10 @@ svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{
 <g id="provinces" fill="none" stroke="#8494a7" stroke-width="1.1" stroke-linejoin="round" pointer-events="none">
 {chr(10).join(prov_paths)}
 </g>
-<g id="muniLabels" font-family="sans-serif" fill="#4b5a6b" text-anchor="middle" pointer-events="none" stroke="#ffffff" stroke-width="2.5" paint-order="stroke" stroke-linejoin="round">
+<g id="muniLabels" font-family="sans-serif" fill="#4b5a6b" text-anchor="middle" pointer-events="none">
 {chr(10).join(muni_labels)}
 </g>
-<g id="provLabels" font-family="sans-serif" font-weight="600" fill="#3d4c5e" text-anchor="middle" pointer-events="none" stroke="#ffffff" stroke-width="3" paint-order="stroke" stroke-linejoin="round">
+<g id="provLabels" font-family="sans-serif" font-weight="600" fill="#3d4c5e" text-anchor="middle" pointer-events="none">
 {chr(10).join(prov_labels)}
 </g>
 </svg>
