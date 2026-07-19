@@ -90,11 +90,16 @@
   }
   #map { width: 100%; height: 100%; display: block; cursor: grab; }
   #map.dragging { cursor: grabbing; }
-  #municipalities path { transition: fill .15s; cursor: pointer; }
+  /* 경계선을 줌과 무관하게 항상 얇게 (non-scaling-stroke) */
+  #municipalities path {
+    transition: fill .15s; cursor: pointer;
+    vector-effect: non-scaling-stroke; stroke-width: 0.7px;
+  }
   #municipalities path:hover { fill: #e3f2e9; }
   #municipalities path.visited { fill: #b7e4c7; }
   #municipalities path.visited:hover { fill: #a4dcb8; }
-  #municipalities path.selected { stroke: #2d6a4f; stroke-width: 1.5; }
+  #municipalities path.selected { stroke: #2d6a4f; stroke-width: 1.8px; }
+  #provinces path { vector-effect: non-scaling-stroke; stroke-width: 1.3px; }
   #muniLabels text.on-visited { fill: #1b4332; stroke: #ffffff; }
   .zoom-btns { position: absolute; right: 14px; bottom: 14px; display: flex; flex-direction: column; gap: 6px; }
   .zoom-btns button {
@@ -627,20 +632,31 @@ $("saveBtn").onclick = async () => {
   }
 };
 
-// ---- 클릭: 방문 토글 + 지역 선택 ----
-let downPos = null;
-paths.forEach(p => {
-  p.addEventListener("pointerdown", e => { downPos = [e.clientX, e.clientY]; });
-  p.addEventListener("pointerup", e => {
-    if (!downPos) return;
-    const moved = Math.hypot(e.clientX - downPos[0], e.clientY - downPos[1]);
-    downPos = null;
-    if (moved > 6) return;
-    // 미방문 지역만 클릭으로 방문 표시. 해제는 상세 패널의 버튼으로만 (실수 방지)
-    if (!visited.has(p.dataset.code)) toggleVisited(p.dataset.code);
-    select(p.dataset.code);
-  });
-});
+// ---- 탭 = 지역 선택만 (방문 표시는 패널의 버튼으로) ----
+// 탭 위치의 지역을 찾되, 정확히 못 맞히면 화면상 가장 가까운 지역으로 스냅 (작은 구 대응)
+function regionAt(clientX, clientY) {
+  const el = document.elementFromPoint(clientX, clientY);
+  if (el && el.parentElement && el.parentElement.id === "municipalities" && el.dataset.code)
+    return el.dataset.code;
+  const r = svg.getBoundingClientRect();
+  if (!r.width) return null;
+  const px = vb.x + (clientX - r.left) / r.width * vb.w;
+  const py = vb.y + (clientY - r.top) / r.height * vb.h;
+  let best = null, bestD = Infinity;
+  for (const p of paths) {
+    const bb = regionBBox(p.dataset.code);
+    if (!bb || !bb.width) continue;
+    const cx = bb.x + bb.width / 2, cy = bb.y + bb.height / 2;
+    const d = Math.hypot(cx - px, cy - py);
+    if (d < bestD) { bestD = d; best = p; }
+  }
+  const tolSvg = 26 / (r.width / vb.w);   // 화면상 26px 이내면 스냅
+  return best && bestD < tolSvg ? best.dataset.code : null;
+}
+function handleTap(clientX, clientY) {
+  const code = regionAt(clientX, clientY);
+  if (code) select(code);
+}
 function toggleVisited(code) {
   const p = paths.find(x => x.dataset.code === code);
   const on = !visited.has(code);
@@ -1033,17 +1049,33 @@ function updateLabels() {
   provLabelsG.style.fontSize = (13 / pxPerUnit) + "px";
   const showMuni = vb.w <= 620;
   provLabelsG.style.display = showMuni ? "none" : "";
+
+  // --- 어떤 시·군·구 이름을 보일지: 큰 지역 우선 + 겹치면 숨김 ---
+  const labelShownMap = {};
+  if (showMuni) {
+    const placed = [];
+    const order = muniTexts.slice().sort((a, b) =>
+      (parseFloat(b.dataset.w) * parseFloat(b.dataset.h || b.dataset.w)) -
+      (parseFloat(a.dataset.w) * parseFloat(a.dataset.h || a.dataset.w)));
+    for (const t of order) {
+      const nameLen = t.textContent.length;
+      const fits = parseFloat(t.dataset.w) * pxPerUnit > nameLen * 11 + 8;
+      if (!fits) { labelShownMap[t.dataset.code] = false; continue; }
+      const cxU = +t.getAttribute("x"), cyU = +t.getAttribute("y");
+      const sx = rect.left + (cxU - vb.x) / vb.w * rect.width;
+      const sy = rect.top + (cyU - vb.y) / vb.h * rect.height;
+      const halfW = nameLen * 11 / 2 + 4, halfH = 9;
+      const box = { l: sx - halfW, t: sy - halfH, r: sx + halfW, b: sy + halfH };
+      const hit = placed.some(p => !(box.r < p.l || box.l > p.r || box.b < p.t || box.t > p.b));
+      if (hit) { labelShownMap[t.dataset.code] = false; }
+      else { labelShownMap[t.dataset.code] = true; placed.push(box); }
+    }
+  }
   const marks = [];
   muniTexts.forEach(t => {
-    let labelShown = false;
-    if (showMuni) {
-      const fits = parseFloat(t.dataset.w) * pxPerUnit > t.textContent.length * 11 + 8;
-      labelShown = fits;
-      t.style.display = fits ? "" : "none";
-      t.classList.toggle("on-visited", visited.has(t.dataset.code));
-    } else {
-      t.style.display = "none";
-    }
+    const labelShown = showMuni && !!labelShownMap[t.dataset.code];
+    t.style.display = labelShown ? "" : "none";
+    if (labelShown) t.classList.toggle("on-visited", visited.has(t.dataset.code));
     if (!visited.has(t.dataset.code)) return;
     const x = +t.getAttribute("x");
     const y = +t.getAttribute("y");
@@ -1118,8 +1150,11 @@ window.addEventListener("resize", updateLabels);
 
 const pointers = new Map();
 let pinchDist = 0;
+let tapStart = null, tapMoved = false;   // 탭 판정용
 svg.addEventListener("pointerdown", e => {
   pointers.set(e.pointerId, e);
+  if (pointers.size === 1) { tapStart = [e.clientX, e.clientY]; tapMoved = false; }
+  else { tapStart = null; }   // 멀티터치면 탭 아님
   if (pointers.size === 2) {
     const [a, b] = [...pointers.values()];
     pinchDist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
@@ -1132,6 +1167,7 @@ svg.addEventListener("pointermove", e => {
   pointers.set(e.pointerId, e);
   const r = svg.getBoundingClientRect();
   if (pointers.size === 1) {
+    if (tapStart && Math.hypot(e.clientX - tapStart[0], e.clientY - tapStart[1]) > 8) tapMoved = true;
     const dx = (e.clientX - prev.clientX) / r.width * vb.w;
     const dy = (e.clientY - prev.clientY) / r.height * vb.h;
     if (dx || dy) { svg.classList.add("dragging"); vb.x -= dx; vb.y -= dy; applyVB(); }
@@ -1148,8 +1184,12 @@ svg.addEventListener("pointermove", e => {
   }
 });
 ["pointerup", "pointercancel"].forEach(ev => svg.addEventListener(ev, e => {
+  // 단일 탭(거의 안 움직임)이면 지역 선택
+  if (ev === "pointerup" && tapStart && !tapMoved && pointers.size === 1) {
+    handleTap(e.clientX, e.clientY);
+  }
   pointers.delete(e.pointerId);
-  if (pointers.size === 0) svg.classList.remove("dragging");
+  if (pointers.size === 0) { svg.classList.remove("dragging"); tapStart = null; }
   pinchDist = 0;
 }));
 
