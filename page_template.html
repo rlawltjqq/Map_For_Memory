@@ -1354,7 +1354,9 @@ function updateLabels() {
       const sy = rect.top + (cyU - vb.y) / vb.h * rect.height;
       const halfW = nameLen * 11 / 2 + 4, halfH = 9;
       const box = { l: sx - halfW, t: sy - halfH, r: sx + halfW, b: sy + halfH };
-      const hit = placed.some(p => !(box.r < p.l || box.l > p.r || box.b < p.t || box.t > p.b));
+      // 선택한 지역 이름은 겹쳐도 항상 표시 (어느 지역인지 헷갈리지 않게)
+      const hit = t.dataset.code !== selected &&
+        placed.some(p => !(box.r < p.l || box.l > p.r || box.b < p.t || box.t > p.b));
       if (hit) { labelShownMap[t.dataset.code] = false; }
       else { labelShownMap[t.dataset.code] = true; placed.push(box); }
     }

@@ -65,6 +65,14 @@ def ring_centroid(pts):
     return cx / (6 * a), cy / (6 * a)
 
 
+DOKDO_LON_MIN = 131.5      # 이 경도보다 동쪽 = 독도
+DOKDO_MIN_UNITS = 4.5      # 전국 뷰에서 보이도록 최소 표시 크기(SVG 단위)
+
+
+def is_dokdo(ring):
+    return min(p[0] for p in ring) > DOKDO_LON_MIN
+
+
 def load_features(path):
     with open(path, encoding="utf-8") as f:
         gj = json.load(f)
@@ -76,9 +84,11 @@ def load_features(path):
         rings_raw.sort(key=ring_area, reverse=True)
         rings = []
         for i, ring in enumerate(rings_raw):
-            if i > 0 and ring_area(ring) < MIN_RING_AREA:
+            dok = is_dokdo(ring)
+            # 독도는 아주 작아 일반 필터·단순화에 사라지므로 예외 처리
+            if i > 0 and not dok and ring_area(ring) < MIN_RING_AREA:
                 continue
-            simp = dp_simplify(ring, SIMPLIFY_TOL)
+            simp = dp_simplify(ring, 0.00005 if dok else SIMPLIFY_TOL)
             if len(simp) >= 4:
                 rings.append(simp)
         out.append((feat["properties"], rings))
@@ -107,6 +117,31 @@ oy = (H - span_y * scale) / 2
 
 def tr(x, y):
     return round(ox + (x - minx) * kx * scale, 1), round(oy + (maxy - y) * scale, 1)
+
+
+def enlarge_dokdo(features):
+    """독도는 실제 크기가 1px 미만이라 전국 뷰에서 안 보인다.
+    지도에 표시되도록 중심을 유지한 채 최소 크기까지만 확대한다."""
+    for props, rings in features:
+        dok = [r for r in rings if is_dokdo(r)]
+        if not dok:
+            continue
+        pts = [p for r in dok for p in r]
+        cx = (min(p[0] for p in pts) + max(p[0] for p in pts)) / 2
+        cy = (min(p[1] for p in pts) + max(p[1] for p in pts)) / 2
+        span_lon = max(p[0] for p in pts) - min(p[0] for p in pts)
+        cur_units = span_lon * kx * scale
+        if cur_units <= 0 or cur_units >= DOKDO_MIN_UNITS:
+            continue
+        k = DOKDO_MIN_UNITS / cur_units
+        for r in dok:
+            for p in r:
+                p[0] = cx + (p[0] - cx) * k
+                p[1] = cy + (p[1] - cy) * k
+
+
+enlarge_dokdo(muni)
+enlarge_dokdo(prov)
 
 
 def to_path(props, rings, with_fill_id=True):
