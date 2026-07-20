@@ -197,13 +197,25 @@ class Handler(SimpleHTTPRequestHandler):
                 if not re.fullmatch(r"\d+", code):
                     self.send_json({"error": "bad code"}, 400)
                     return
-                d = (body.get("date") or "")[:10]
-                m = (body.get("memo") or "")[:500]
+                visits = body.get("visits")
+                if not isinstance(visits, list):
+                    self.send_json({"error": "bad visits"}, 400)
+                    return
+                def _date(s):
+                    return s if isinstance(s, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", s) else ""
+                clean = []
+                for v in visits[:50]:
+                    if not isinstance(v, dict):
+                        continue
+                    item = {"start": _date(v.get("start")), "end": _date(v.get("end")),
+                            "memo": (v.get("memo") or "")[:500] if isinstance(v.get("memo"), str) else ""}
+                    if item["start"] or item["end"] or item["memo"]:
+                        clean.append(item)
                 notes = meta.setdefault("notes", {})
-                if not d and not m:
+                if not clean:
                     notes.pop(code, None)
                 else:
-                    notes[code] = {"date": d, "memo": m}
+                    notes[code] = {"visits": clean}
                 save_rooms(rooms)
             self.send_json({"ok": True})
             return

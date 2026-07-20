@@ -151,15 +151,37 @@
   }
   .upload-btn:hover { background: #f3f4f6; }
   #uploadMsg { font-size: 11.5px; color: #9ca3af; text-align: center; margin-top: 6px; }
-  .note-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
-  .note-row input[type=date], .note-row textarea {
-    width: 100%; font-size: 13px; border: 1px solid #e2e8f0; border-radius: 8px;
-    padding: 7px 9px; color: #374151; background: #fff;
+  /* 방문 기록 (여러 번 방문 지원) */
+  .sec-head {
+    font-size: 11.5px; font-weight: 600; color: #9ca3af; margin: 12px 0 6px;
   }
-  .note-row textarea { resize: vertical; line-height: 1.4; }
-  .note-row input[type=date]:focus, .note-row textarea:focus {
-    outline: none; border-color: #3b9c6e;
+  .visit-card {
+    border: 1px solid #e8ecf0; border-radius: 10px; padding: 9px 10px;
+    margin-bottom: 7px; background: #fff;
   }
+  .visit-top { display: flex; align-items: center; gap: 5px; margin-bottom: 6px; }
+  .visit-top .dlabel { font-size: 11px; color: #9ca3af; flex-shrink: 0; }
+  .visit-card input[type=date] {
+    flex: 1; min-width: 0; font-size: 12.5px; border: 1px solid #e2e8f0;
+    border-radius: 7px; padding: 6px 7px; color: #374151; background: #fff;
+  }
+  .visit-card .tilde { color: #9ca3af; font-size: 12px; flex-shrink: 0; }
+  .visit-card textarea {
+    width: 100%; font-size: 13px; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 7px 8px; color: #374151; background: #fff; resize: vertical; line-height: 1.4;
+  }
+  .visit-card input:focus, .visit-card textarea:focus { outline: none; border-color: #3b9c6e; }
+  .visit-del {
+    margin-left: auto; width: 24px; height: 24px; border: none; background: #f3f4f6;
+    color: #9ca3af; border-radius: 50%; font-size: 12px; cursor: pointer; flex-shrink: 0;
+  }
+  .visit-del:hover { background: #fee2e2; color: #b91c1c; }
+  .add-visit {
+    width: 100%; padding: 8px; font-size: 12.5px; border: 1px dashed #cbd5e1;
+    border-radius: 8px; background: #fff; color: #4b5563; cursor: pointer;
+  }
+  .add-visit:hover { background: #f1f7f3; border-color: #3b9c6e; color: #2d6a4f; }
+  #visitList:empty + .add-visit { border-color: #9ca3af; }
   /* 여행 앨범 (기록 탭) */
   #memoryFeed:empty::after {
     content: "아직 남긴 기록이 없어요.\A지역을 눌러 사진·메모를 남겨보세요.";
@@ -176,6 +198,13 @@
   .mem-title { font-size: 13.5px; font-weight: 700; color: #1f2937; }
   .mem-prov { font-size: 11px; color: #9ca3af; }
   .mem-date { margin-left: auto; font-size: 11.5px; color: #6b7280; }
+  .mem-count {
+    margin-left: auto; font-size: 11px; color: #2d6a4f; background: #dcf5e8;
+    padding: 2px 8px; border-radius: 999px; flex-shrink: 0;
+  }
+  .mem-visit { display: flex; gap: 7px; font-size: 12.5px; line-height: 1.5; margin-bottom: 5px; }
+  .mem-vdate { color: #2d6a4f; font-weight: 600; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+  .mem-vmemo { color: #4b5563; white-space: pre-wrap; min-width: 0; }
   .mem-memo { font-size: 12.5px; color: #4b5563; line-height: 1.5; margin-bottom: 8px; white-space: pre-wrap; }
   .mem-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 5px; }
   .mem-photos img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 7px; cursor: pointer; }
@@ -898,10 +927,10 @@
             <button id="rpToggle"></button>
             <button id="rpClose" title="닫기">✕</button>
           </div>
-          <div class="note-row">
-            <input type="date" id="rpDate" title="방문한 날">
-            <textarea id="rpMemo" rows="2" maxlength="500" placeholder="이 곳에서의 기억을 남겨보세요"></textarea>
-          </div>
+          <div class="sec-head">방문 기록</div>
+          <div id="visitList"></div>
+          <button class="add-visit" id="addVisitBtn">+ 방문 추가</button>
+          <div class="sec-head">사진</div>
           <div id="photoGrid"></div>
           <label class="upload-btn" id="uploadBtn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 8.5A1.5 1.5 0 0 1 6 7h2l1.6-2.2A1.5 1.5 0 0 1 10.8 4h2.4a1.5 1.5 0 0 1 1.2.8L16 7h2a1.5 1.5 0 0 1 1.5 1.5V18A1.5 1.5 0 0 1 18 19.5H6A1.5 1.5 0 0 1 4.5 18Z"/><circle cx="12" cy="13" r="3.2"/></svg> 사진 추가<input type="file" id="photoInput" accept="image/*" multiple hidden></label>
           <div id="uploadMsg"></div>
@@ -1274,9 +1303,7 @@ function renderPanel() {
   const t = $("rpToggle");
   t.textContent = v ? "✓ 방문함" : "방문 표시";
   t.className = v ? "v" : "";
-  const note = notes[selected] || {};
-  $("rpDate").value = note.date || "";
-  $("rpMemo").value = note.memo || "";
+  renderVisits();
   const grid = $("photoGrid");
   grid.innerHTML = "";
   (photos[selected] || []).forEach(ph => {
@@ -1305,26 +1332,93 @@ function renderPanel() {
 }
 $("rpToggle").onclick = () => { if (selected) { toggleVisited(selected); renderPanel(); } };
 
-// 방문 날짜·메모 저장 (입력이 끝나면)
-let noteTimer = null;
-function saveNote() {
-  if (!selected) return;
-  const code = selected;
-  const date = $("rpDate").value || "";
-  const memo = $("rpMemo").value || "";
-  if (date || memo) notes[code] = { date, memo };
+// ---- 방문 기록(여러 번 방문 지원) ----
+// 저장 형태: notes[code] = { visits: [{start, end, memo}] }
+// 예전 형태({date, memo})는 읽을 때 자동 변환
+function normVisits(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw.visits)) return raw.visits.map(v => ({
+    start: v.start || "", end: v.end || "", memo: v.memo || ""
+  }));
+  if (raw.date || raw.memo) return [{ start: raw.date || "", end: "", memo: raw.memo || "" }];
+  return [];
+}
+function getVisits(code) { return normVisits(notes[code]); }
+
+function renderVisits() {
+  const list = $("visitList");
+  const visits = getVisits(selected);
+  list.innerHTML = visits.map((v, i) => `
+    <div class="visit-card" data-i="${i}">
+      <div class="visit-top">
+        <span class="dlabel">방문일</span>
+        <input type="date" class="v-start" value="${v.start}" max="2999-12-31">
+        <span class="tilde">~</span>
+        <input type="date" class="v-end" value="${v.end}" max="2999-12-31" title="여러 날 머물렀다면 마지막 날 (선택)">
+        <button class="visit-del" title="이 방문 기록 삭제">✕</button>
+      </div>
+      <textarea rows="2" maxlength="500" class="v-memo" placeholder="이때의 기억을 남겨보세요">${escapeHtml(v.memo)}</textarea>
+    </div>`).join("");
+  list.querySelectorAll(".visit-card").forEach(card => {
+    const i = +card.dataset.i;
+    const start = card.querySelector(".v-start");
+    const end = card.querySelector(".v-end");
+    const memo = card.querySelector(".v-memo");
+    const commit = () => {
+      const vs = getVisits(selected);
+      if (!vs[i]) return;
+      // 종료일이 시작일보다 빠르면 자동 교정
+      let s = start.value, e = end.value;
+      if (s && e && e < s) { e = s; end.value = e; }
+      vs[i] = { start: s, end: e, memo: memo.value };
+      saveVisits(selected, vs);
+    };
+    start.onchange = commit;
+    end.onchange = commit;
+    let tmr = null;
+    memo.oninput = () => { clearTimeout(tmr); tmr = setTimeout(commit, 600); };
+    memo.onblur = () => { clearTimeout(tmr); commit(); };
+    card.querySelector(".visit-del").onclick = () => {
+      const vs = getVisits(selected);
+      vs.splice(i, 1);
+      saveVisits(selected, vs);
+      renderVisits();
+    };
+  });
+}
+function saveVisits(code, visits) {
+  const clean = visits.filter(v => v.start || v.end || v.memo);
+  if (clean.length) notes[code] = { visits: clean };
   else delete notes[code];
-  // 메모를 남겼는데 아직 미방문이면 자동으로 방문 처리
-  if ((date || memo) && !visited.has(code)) toggleVisited(code);
+  // 방문 기록을 남겼는데 아직 미방문이면 자동으로 방문 처리
+  if (clean.length && !visited.has(code)) toggleVisited(code);
   renderFeed();
   api("/api/note", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ room: ROOM, code, date, memo })
+    body: JSON.stringify({ room: ROOM, code, visits: clean })
   }).then(() => setBadge(true)).catch(() => setBadge(false));
 }
-$("rpDate").onchange = saveNote;
-$("rpMemo").oninput = () => { clearTimeout(noteTimer); noteTimer = setTimeout(saveNote, 600); };
-$("rpMemo").onblur = () => { clearTimeout(noteTimer); saveNote(); };
+$("addVisitBtn").onclick = () => {
+  if (!selected) return;
+  const vs = getVisits(selected);
+  vs.push({ start: "", end: "", memo: "" });
+  notes[selected] = { visits: vs };
+  renderVisits();
+  const last = $("visitList").querySelector(".visit-card:last-child .v-start");
+  if (last) last.focus();
+};
+// 날짜(기간) 표시용 문자열
+function visitDateText(v) {
+  const f = d => d.replace(/-/g, ".");
+  if (v.start && v.end && v.end !== v.start) {
+    // 같은 해·달이면 끝 날짜는 일만 (2026.07.15~16)
+    const [ys, ms] = v.start.split("-"), [ye, me, de] = v.end.split("-");
+    if (ys === ye && ms === me) return `${f(v.start)}~${de}`;
+    if (ys === ye) return `${f(v.start)}~${me}.${de}`;
+    return `${f(v.start)}~${f(v.end)}`;
+  }
+  return f(v.start || v.end || "");
+}
 
 // 여행 앨범 피드 (기록 탭): 방문 날짜 최신순, 사진·메모 있는 곳 위주
 function renderFeed() {
@@ -1334,18 +1428,27 @@ function renderFeed() {
   const codes = new Set([...Object.keys(notes), ...Object.keys(photos)]);
   codes.forEach(code => {
     if (!nameByCode[code]) return;   // 지도에 없는 코드는 건너뜀
-    const note = notes[code] || {};
+    const visits = getVisits(code).filter(v => v.start || v.end || v.memo);
     const ph = photos[code] || [];
-    if (!note.date && !note.memo && ph.length === 0) return;
-    entries.push({ code, date: note.date || "", memo: note.memo || "", photos: ph });
+    if (!visits.length && ph.length === 0) return;
+    // 최신 방문이 위로
+    visits.sort((a, b) => (b.start || b.end || "0").localeCompare(a.start || a.end || "0"));
+    entries.push({ code, visits, photos: ph, latest: (visits[0] && (visits[0].start || visits[0].end)) || "0" });
   });
-  entries.sort((a, b) => (b.date || "0").localeCompare(a.date || "0"));
+  entries.sort((a, b) => b.latest.localeCompare(a.latest));
   feed.innerHTML = entries.map(e => {
     const emblem = EMBLEMS[e.code];
     const prov = PROV[e.code.slice(0, 2)] || "";
     const name = nameByCode[e.code] || "";
-    const dateHtml = e.date ? `<span class="mem-date">${e.date.replace(/-/g, ".")}</span>` : "";
-    const memoHtml = e.memo ? `<div class="mem-memo">${escapeHtml(e.memo)}</div>` : "";
+    const countHtml = e.visits.length > 1
+      ? `<span class="mem-count">${e.visits.length}번 방문</span>` : "";
+    const visitsHtml = e.visits.map(v => {
+      const d = visitDateText(v);
+      return `<div class="mem-visit">
+        ${d ? `<span class="mem-vdate">${d}</span>` : ""}
+        ${v.memo ? `<span class="mem-vmemo">${escapeHtml(v.memo)}</span>` : ""}
+      </div>`;
+    }).join("");
     const photosHtml = e.photos.length
       ? `<div class="mem-photos">${e.photos.map(p =>
           `<img src="${p.url}" loading="lazy" data-full="${p.url}">`).join("")}</div>`
@@ -1354,8 +1457,8 @@ function renderFeed() {
       <div class="mem-head">
         ${emblem ? `<img src="${emblem}" alt="">` : ""}
         <div><div class="mem-title">${name}</div><div class="mem-prov">${prov}</div></div>
-        ${dateHtml}
-      </div>${memoHtml}${photosHtml}</div>`;
+        ${countHtml}
+      </div>${visitsHtml}${photosHtml}</div>`;
   }).join("");
   feed.querySelectorAll("img[data-full]").forEach(img => {
     img.onclick = (ev) => {
