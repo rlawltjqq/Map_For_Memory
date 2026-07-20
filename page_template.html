@@ -220,6 +220,25 @@
     width: 100%; padding: 9px; margin-top: 4px; border: none; border-radius: 9px;
     background: #f3f4f6; color: #4b5563; font-size: 13px; cursor: pointer;
   }
+  /* 전체 초기화 확인 */
+  #resetModal {
+    position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none;
+    align-items: center; justify-content: center; z-index: 45; padding: 20px;
+  }
+  #resetModal.show { display: flex; }
+  #resetModal .card { background: #fff; border-radius: 14px; padding: 20px; width: 100%; max-width: 340px; }
+  #resetModal h3 { font-size: 16px; margin-bottom: 8px; }
+  #resetModal p { font-size: 12.5px; color: #6b7280; line-height: 1.55; margin-bottom: 12px; }
+  #resetPw {
+    width: 100%; padding: 10px 12px; font-size: 14px; border: 1px solid #d1d5db;
+    border-radius: 8px; margin-bottom: 4px;
+  }
+  #resetPw:focus { outline: none; border-color: #b91c1c; }
+  .rm-btns { display: flex; gap: 8px; margin-top: 8px; }
+  .rm-btns button { flex: 1; padding: 10px; font-size: 13.5px; border-radius: 9px; cursor: pointer; border: none; }
+  #resetCancel { background: #f3f4f6; color: #4b5563; }
+  #resetConfirm { background: #b91c1c; color: #fff; font-weight: 600; }
+  #resetConfirm:disabled { opacity: .6; cursor: default; }
   .v-addphoto {
     width: 100%; padding: 7px; font-size: 12px; border: 1px dashed #d7dde5;
     border-radius: 7px; background: #fff; color: #6b7280; cursor: pointer;
@@ -473,6 +492,18 @@
     <h3>어느 방문의 사진인가요?</h3>
     <div id="moveList"></div>
     <button id="moveCancel">취소</button>
+  </div>
+</div>
+<div id="resetModal">
+  <div class="card">
+    <h3>전체 초기화</h3>
+    <p id="resetDesc"></p>
+    <input type="password" id="resetPw" placeholder="지도 비밀번호" autocomplete="current-password">
+    <div class="err" id="resetErr"></div>
+    <div class="rm-btns">
+      <button id="resetCancel">취소</button>
+      <button id="resetConfirm">초기화</button>
+    </div>
   </div>
 </div>
 
@@ -1484,19 +1515,40 @@ svg.addEventListener("pointermove", e => {
 }));
 
 // ---- 내보내기 / 가져오기 / 초기화 ----
-function pushAll(codes) {
-  return api("/api/visited", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ room: ROOM, codes })
-  });
-}
-$("resetBtn").onclick = async () => {
-  if (!confirm(`방문 표시 ${visited.size}곳을 모두 지울까요?\n(사진·메모는 지워지지 않습니다. 함께 쓰는 지도라면 모두에게 적용됩니다.)`)) return;
-  visited.clear();
-  paths.forEach(p => p.classList.remove("visited"));
-  render(); updateLabels();
-  if (selected) renderPanel();
-  try { await pushAll([]); setBadge(true); } catch { setBadge(false); }
+// 전체 초기화 — 지도 비밀번호 확인 후 실행 (서버에서 검증)
+$("resetBtn").onclick = () => {
+  $("resetDesc").innerHTML =
+    `방문 표시 <b>${visited.size}곳</b>이 모두 지워집니다.<br>` +
+    `사진·메모는 그대로 남습니다.<br>함께 쓰는 지도라면 모두에게 적용됩니다.`;
+  $("resetPw").value = "";
+  $("resetErr").textContent = "";
+  $("resetModal").classList.add("show");
+  $("resetPw").focus();
+};
+$("resetCancel").onclick = () => $("resetModal").classList.remove("show");
+$("resetModal").onclick = (e) => { if (e.target.id === "resetModal") $("resetModal").classList.remove("show"); };
+$("resetPw").onkeydown = (e) => { if (e.key === "Enter") $("resetConfirm").click(); };
+$("resetConfirm").onclick = async () => {
+  const pw = $("resetPw").value;
+  if (!pw) { $("resetErr").textContent = "비밀번호를 입력해 주세요."; return; }
+  $("resetConfirm").disabled = true;
+  $("resetErr").textContent = "";
+  try {
+    await api("/api/reset", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ room: ROOM, password: pw })
+    });
+    visited.clear();
+    paths.forEach(p => p.classList.remove("visited"));
+    render(); updateLabels();
+    if (selected) renderPanel();
+    setBadge(true);
+    $("resetModal").classList.remove("show");
+  } catch (e) {
+    $("resetErr").textContent = e.message === "Failed to fetch" ? "서버 연결 실패" : (e.message || "초기화 실패");
+  } finally {
+    $("resetConfirm").disabled = false;
+  }
 };
 
 // ---- 시작 ----

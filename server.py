@@ -166,20 +166,32 @@ class Handler(SimpleHTTPRequestHandler):
                 if not meta:
                     self.send_json({"error": "unauthorized"}, 403)
                     return
-                codes = body.get("codes")
                 code = str(body.get("code") or "")
-                if isinstance(codes, list):
-                    if not all(re.fullmatch(r"\d+", str(c)) for c in codes):
-                        self.send_json({"error": "bad codes"}, 400)
-                        return
-                    meta["visited"] = sorted({str(c) for c in codes})
-                elif re.fullmatch(r"\d+", code):
+                # 전체 교체는 지원 안 함 — 전체 삭제는 비밀번호가 필요한 /api/reset 으로만
+                if re.fullmatch(r"\d+", code):
                     s = set(meta.get("visited", []))
                     (s.add if body.get("on") else s.discard)(code)
                     meta["visited"] = sorted(s)
                 else:
                     self.send_json({"error": "bad request"}, 400)
                     return
+                save_rooms(rooms)
+            self.send_json({"ok": True})
+            return
+
+        if url.path == "/api/reset":
+            body = self.read_json()
+            room_id = body.get("room") or ""
+            with _lock:
+                rooms = load_rooms()
+                meta = self.auth(rooms, room_id)
+                if not meta:
+                    self.send_json({"error": "unauthorized"}, 403)
+                    return
+                if hash_pw(body.get("password") or "", meta["salt"]) != meta["pwhash"]:
+                    self.send_json({"error": "비밀번호가 틀렸습니다"}, 403)
+                    return
+                meta["visited"] = []
                 save_rooms(rooms)
             self.send_json({"ok": True})
             return
