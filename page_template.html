@@ -178,6 +178,21 @@
     color: #9ca3af; border-radius: 50%; font-size: 12px; cursor: pointer; flex-shrink: 0;
   }
   .visit-del:hover { background: #fee2e2; color: #b91c1c; }
+  /* 방문별 사진 */
+  .v-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 5px; margin: 7px 0; }
+  .v-photos .ph { position: relative; aspect-ratio: 1; border-radius: 7px; overflow: hidden; }
+  .v-photos img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: pointer; }
+  .v-photos .del {
+    position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; border-radius: 50%;
+    background: rgba(0,0,0,.55); color: #fff; border: none; font-size: 10px; line-height: 1;
+    cursor: pointer; display: none;
+  }
+  .v-photos .ph:hover .del { display: block; }
+  .v-addphoto {
+    width: 100%; padding: 7px; font-size: 12px; border: 1px dashed #d7dde5;
+    border-radius: 7px; background: #fff; color: #6b7280; cursor: pointer;
+  }
+  .v-addphoto:hover { background: #f1f7f3; border-color: #3b9c6e; color: #2d6a4f; }
   .add-visit {
     width: 100%; padding: 8px; font-size: 12.5px; border: 1px dashed #cbd5e1;
     border-radius: 8px; background: #fff; color: #4b5563; cursor: pointer;
@@ -386,9 +401,9 @@
           <div class="sec-head">방문 기록</div>
           <div id="visitList"></div>
           <button class="add-visit" id="addVisitBtn">+ 방문 추가</button>
-          <div class="sec-head">사진</div>
+          <div class="sec-head" id="unassignedHead" style="display:none">방문일 미지정 사진</div>
           <div id="photoGrid"></div>
-          <label class="upload-btn" id="uploadBtn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 8.5A1.5 1.5 0 0 1 6 7h2l1.6-2.2A1.5 1.5 0 0 1 10.8 4h2.4a1.5 1.5 0 0 1 1.2.8L16 7h2a1.5 1.5 0 0 1 1.5 1.5V18A1.5 1.5 0 0 1 18 19.5H6A1.5 1.5 0 0 1 4.5 18Z"/><circle cx="12" cy="13" r="3.2"/></svg> 사진 추가<input type="file" id="photoInput" accept="image/*" multiple hidden></label>
+          <input type="file" id="photoInput" accept="image/*" multiple hidden>
           <div id="uploadMsg"></div>
         </div>
       </div>
@@ -773,46 +788,68 @@ function renderPanel() {
   t.textContent = v ? "✓ 방문함" : "방문 표시";
   t.className = v ? "v" : "";
   renderVisits();
+  // 방문에 속하지 않은 사진(예전 기록)만 따로 표시
+  const unassigned = unassignedPhotos(selected);
+  $("unassignedHead").style.display = unassigned.length ? "" : "none";
   const grid = $("photoGrid");
-  grid.innerHTML = "";
-  (photos[selected] || []).forEach(ph => {
-    const div = document.createElement("div");
-    div.className = "ph";
-    div.innerHTML = `<img src="${ph.url}" alt="${ph.name}" loading="lazy"><button class="del" title="삭제">✕</button>`;
-    div.querySelector("img").onclick = () => {
-      $("lightbox").style.display = "flex";
-      $("lightbox").querySelector("img").src = ph.url;
-    };
-    div.querySelector(".del").onclick = async e => {
-      e.stopPropagation();
-      if (!confirm("이 사진을 삭제할까요?")) return;
-      try {
-        await api(`/api/photo?room=${ROOM}&code=${selected}`, {
-          method: "DELETE", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: ph.url })
-        });
-        photos[selected] = (photos[selected] || []).filter(x => x.url !== ph.url);
-        if (!photos[selected].length) delete photos[selected];
-        renderPanel(); renderFeed();
-      } catch { alert("삭제 실패"); }
-    };
-    grid.appendChild(div);
-  });
+  grid.innerHTML = unassigned.length ? photoGridHtml(unassigned) : "";
+  wirePhotoGrid(grid, selected);
 }
 $("rpToggle").onclick = () => { if (selected) { toggleVisited(selected); renderPanel(); } };
 
 // ---- 방문 기록(여러 번 방문 지원) ----
 // 저장 형태: notes[code] = { visits: [{start, end, memo}] }
 // 예전 형태({date, memo})는 읽을 때 자동 변환
+function newVid() { return "v" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 function normVisits(raw) {
   if (!raw) return [];
   if (Array.isArray(raw.visits)) return raw.visits.map(v => ({
-    start: v.start || "", end: v.end || "", memo: v.memo || ""
+    id: v.id || newVid(), start: v.start || "", end: v.end || "", memo: v.memo || ""
   }));
-  if (raw.date || raw.memo) return [{ start: raw.date || "", end: "", memo: raw.memo || "" }];
+  if (raw.date || raw.memo) return [{ id: newVid(), start: raw.date || "", end: "", memo: raw.memo || "" }];
   return [];
 }
 function getVisits(code) { return normVisits(notes[code]); }
+// 방문별 사진 / 방문일 미지정 사진
+function photosOfVisit(code, vid) {
+  return (photos[code] || []).filter(p => (p.vid || "") === vid);
+}
+function unassignedPhotos(code) {
+  const ids = new Set(getVisits(code).map(v => v.id));
+  return (photos[code] || []).filter(p => !p.vid || !ids.has(p.vid));
+}
+function photoGridHtml(list) {
+  if (!list.length) return "";
+  return `<div class="v-photos">${list.map(p =>
+    `<div class="ph"><img src="${p.url}" alt="${escapeHtml(p.name || "")}" loading="lazy" data-full="${p.url}">` +
+    `<button class="del" data-url="${p.url}" title="삭제">✕</button></div>`).join("")}</div>`;
+}
+// 그리드 안의 사진 클릭(확대)·삭제 연결
+function wirePhotoGrid(root, code) {
+  root.querySelectorAll("img[data-full]").forEach(img => {
+    img.onclick = (ev) => {
+      ev.stopPropagation();
+      $("lightbox").style.display = "flex";
+      $("lightbox").querySelector("img").src = img.dataset.full;
+    };
+  });
+  root.querySelectorAll("button.del[data-url]").forEach(btn => {
+    btn.onclick = async (ev) => {
+      ev.stopPropagation();
+      if (!confirm("이 사진을 삭제할까요?")) return;
+      const url = btn.dataset.url;
+      try {
+        await api(`/api/photo?room=${ROOM}&code=${code}`, {
+          method: "DELETE", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url })
+        });
+        photos[code] = (photos[code] || []).filter(x => x.url !== url);
+        if (!photos[code].length) delete photos[code];
+        renderPanel(); renderFeed();
+      } catch { alert("삭제 실패"); }
+    };
+  });
+}
 
 function renderVisits() {
   const list = $("visitList");
@@ -829,6 +866,8 @@ function renderVisits() {
         <input type="date" class="v-end" value="${v.end}" max="2999-12-31" aria-label="종료일(선택)">
       </div>
       <textarea rows="2" maxlength="500" class="v-memo" placeholder="이때의 기억을 남겨보세요">${escapeHtml(v.memo)}</textarea>
+      ${photoGridHtml(photosOfVisit(selected, v.id))}
+      <button class="v-addphoto" data-vid="${v.id}">📷 이 방문의 사진 추가</button>
     </div>`).join("");
   list.querySelectorAll(".visit-card").forEach(card => {
     const i = +card.dataset.i;
@@ -841,7 +880,7 @@ function renderVisits() {
       // 종료일이 시작일보다 빠르면 자동 교정
       let s = start.value, e = end.value;
       if (s && e && e < s) { e = s; end.value = e; }
-      vs[i] = { start: s, end: e, memo: memo.value };
+      vs[i] = { id: vs[i].id, start: s, end: e, memo: memo.value };   // id 유지 (사진 연결)
       saveVisits(selected, vs);
     };
     start.onchange = commit;
@@ -849,16 +888,36 @@ function renderVisits() {
     let tmr = null;
     memo.oninput = () => { clearTimeout(tmr); tmr = setTimeout(commit, 600); };
     memo.onblur = () => { clearTimeout(tmr); commit(); };
-    card.querySelector(".visit-del").onclick = () => {
-      const vs = getVisits(selected);
+    card.querySelector(".visit-del").onclick = async () => {
+      const code = selected;
+      const vs = getVisits(code);
+      const gone = vs[i];
+      const ph = gone ? photosOfVisit(code, gone.id) : [];
+      if (ph.length && !confirm(`이 방문 기록과 사진 ${ph.length}장이 함께 삭제됩니다. 계속할까요?`)) return;
+      for (const p of ph) {
+        try {
+          await api(`/api/photo?room=${ROOM}&code=${code}`, {
+            method: "DELETE", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: p.url })
+          });
+        } catch {}
+        photos[code] = (photos[code] || []).filter(x => x.url !== p.url);
+      }
+      if (photos[code] && !photos[code].length) delete photos[code];
       vs.splice(i, 1);
-      saveVisits(selected, vs);
-      renderVisits();
+      saveVisits(code, vs);
+      renderPanel();
     };
+    card.querySelector(".v-addphoto").onclick = () => {
+      pendingVid = card.querySelector(".v-addphoto").dataset.vid;
+      $("photoInput").click();
+    };
+    wirePhotoGrid(card, selected);
   });
 }
 function saveVisits(code, visits) {
-  const clean = visits.filter(v => v.start || v.end || v.memo);
+  // 사용자가 명시적으로 추가한 방문은 비어 있어도 유지 (사진·날짜를 나중에 채울 수 있게)
+  const clean = visits.filter(v => v.id);
   if (clean.length) notes[code] = { visits: clean };
   else delete notes[code];
   // 방문 기록을 남겼는데 아직 미방문이면 자동으로 방문 처리
@@ -869,11 +928,12 @@ function saveVisits(code, visits) {
     body: JSON.stringify({ room: ROOM, code, visits: clean })
   }).then(() => setBadge(true)).catch(() => setBadge(false));
 }
+let pendingVid = "";   // 어느 방문 기록에 사진을 올릴지
 $("addVisitBtn").onclick = () => {
   if (!selected) return;
   const vs = getVisits(selected);
-  vs.push({ start: "", end: "", memo: "" });
-  notes[selected] = { visits: vs };
+  vs.push({ id: newVid(), start: "", end: "", memo: "" });
+  saveVisits(selected, vs);   // 바로 저장해야 동기화에 지워지지 않음
   renderVisits();
   const last = $("visitList").querySelector(".visit-card:last-child .v-start");
   if (last) last.focus();
@@ -915,13 +975,20 @@ function renderFeed() {
       ? `<span class="mem-count">${e.visits.length}번 방문</span>` : "";
     const visitsHtml = e.visits.map(v => {
       const d = visitDateText(v);
+      const vp = e.photos.filter(p => (p.vid || "") === v.id);
       return `<div class="mem-visit">
         ${d ? `<span class="mem-vdate">${d}</span>` : ""}
         ${v.memo ? `<span class="mem-vmemo">${escapeHtml(v.memo)}</span>` : ""}
-      </div>`;
+      </div>` + (vp.length
+        ? `<div class="mem-photos">${vp.map(p =>
+            `<img src="${p.url}" loading="lazy" data-full="${p.url}">`).join("")}</div>`
+        : "");
     }).join("");
-    const photosHtml = e.photos.length
-      ? `<div class="mem-photos">${e.photos.map(p =>
+    // 방문에 속하지 않은 사진은 맨 아래
+    const vids = new Set(e.visits.map(v => v.id));
+    const rest = e.photos.filter(p => !p.vid || !vids.has(p.vid));
+    const photosHtml = rest.length
+      ? `<div class="mem-photos">${rest.map(p =>
           `<img src="${p.url}" loading="lazy" data-full="${p.url}">`).join("")}</div>`
       : "";
     return `<div class="mem-card" data-code="${e.code}">
@@ -982,23 +1049,25 @@ async function compressImage(file) {
 }
 $("photoInput").addEventListener("change", async e => {
   if (!selected) { e.target.value = ""; return; }
+  const code = selected, vid = pendingVid;
   const files = [...e.target.files];
   e.target.value = "";
   for (let i = 0; i < files.length; i++) {
     $("uploadMsg").textContent = `업로드 중… (${i + 1}/${files.length})`;
     try {
       const { blob, name } = await compressImage(files[i]);
-      const j = await api(`/api/photo?room=${ROOM}&code=${selected}`, {
+      const j = await api(`/api/photo?room=${ROOM}&code=${code}&vid=${encodeURIComponent(vid)}`, {
         method: "POST",
         headers: { "Content-Type": "application/octet-stream", "X-Filename": encodeURIComponent(name) },
         body: blob
       });
-      (photos[selected] = photos[selected] || []).push({ url: j.url, name: j.name });
+      (photos[code] = photos[code] || []).push({ url: j.url, name: j.name, vid: j.vid || vid });
     } catch { alert(`${files[i].name} 업로드 실패`); }
   }
   $("uploadMsg").textContent = "";
-  // 사진을 올렸는데 미방문이면 자동 방문 처리
-  if ((photos[selected] || []).length && !visited.has(selected)) toggleVisited(selected);
+  // 사진만 올린 방문 기록도 서버에 남도록 저장
+  if (vid) saveVisits(code, getVisits(code));
+  else if ((photos[code] || []).length && !visited.has(code)) toggleVisited(code);
   renderPanel(); renderFeed();
 });
 $("lightbox").onclick = () => { $("lightbox").style.display = "none"; };

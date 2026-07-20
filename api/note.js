@@ -11,10 +11,11 @@ export default async function handler(req, res) {
   if (!Array.isArray(visits)) return res.status(400).json({ error: "bad visits" });
 
   const clean = visits.slice(0, 50).map((v) => ({
+    id: typeof (v && v.id) === "string" && /^[\w-]{1,40}$/.test(v.id) ? v.id : "",
     start: isDate(v && v.start) ? v.start : "",
     end: isDate(v && v.end) ? v.end : "",
     memo: typeof (v && v.memo) === "string" ? v.memo.slice(0, 500) : "",
-  })).filter((v) => v.start || v.end || v.memo);
+  })).filter((v) => v.id || v.start || v.end || v.memo);
 
   const key = `room:${room}:notes`;
   if (clean.length === 0) await redis.hdel(key, String(code));

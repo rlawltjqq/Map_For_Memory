@@ -2,9 +2,11 @@ import { put, del } from "@vercel/blob";
 import { redis, authRoom } from "./_lib.js";
 
 export default async function handler(req, res) {
-  const { room, code } = req.query;
+  const { room, code, vid } = req.query;
   if (!(await authRoom(req, room))) return res.status(403).json({ error: "unauthorized" });
   if (!/^\d+$/.test(code || "")) return res.status(400).json({ error: "bad code" });
+  // vid = 어느 방문 기록에 속한 사진인지 (없으면 방문일 미지정)
+  const visitId = typeof vid === "string" && /^[\w-]{1,40}$/.test(vid) ? vid : "";
   const key = `room:${room}:photos`;
 
   if (req.method === "POST") {
@@ -17,9 +19,9 @@ export default async function handler(req, res) {
       access: "public",
     });
     const list = (await redis.hget(key, code)) || [];
-    list.push({ url: blob.url, name });
+    list.push({ url: blob.url, name, vid: visitId });
     await redis.hset(key, { [code]: list });
-    return res.json({ ok: true, url: blob.url, name });
+    return res.json({ ok: true, url: blob.url, name, vid: visitId });
   }
 
   if (req.method === "DELETE") {

@@ -207,9 +207,11 @@ class Handler(SimpleHTTPRequestHandler):
                 for v in visits[:50]:
                     if not isinstance(v, dict):
                         continue
-                    item = {"start": _date(v.get("start")), "end": _date(v.get("end")),
+                    vid = v.get("id")
+                    vid = vid if isinstance(vid, str) and re.fullmatch(r"[\w-]{1,40}", vid) else ""
+                    item = {"id": vid, "start": _date(v.get("start")), "end": _date(v.get("end")),
                             "memo": (v.get("memo") or "")[:500] if isinstance(v.get("memo"), str) else ""}
-                    if item["start"] or item["end"] or item["memo"]:
+                    if item["id"] or item["start"] or item["end"] or item["memo"]:
                         clean.append(item)
                 notes = meta.setdefault("notes", {})
                 if not clean:
@@ -227,6 +229,8 @@ class Handler(SimpleHTTPRequestHandler):
             if not re.fullmatch(r"\d+", code):
                 self.send_json({"error": "bad code"}, 400)
                 return
+            vid_raw = (q.get("vid") or [""])[0]
+            visit_id = vid_raw if re.fullmatch(r"[\w-]{1,40}", vid_raw or "") else ""
             data = self.read_body_bytes()
             with _lock:
                 rooms = load_rooms()
@@ -245,9 +249,9 @@ class Handler(SimpleHTTPRequestHandler):
                     f.write(data)
                 url_path = f"/data/photos/{room_id}/{code}/{fname}"
                 meta.setdefault("photos", {}).setdefault(code, []).append(
-                    {"url": url_path, "name": name})
+                    {"url": url_path, "name": name, "vid": visit_id})
                 save_rooms(rooms)
-            self.send_json({"ok": True, "url": url_path, "name": name})
+            self.send_json({"ok": True, "url": url_path, "name": name, "vid": visit_id})
             return
 
         self.send_json({"error": "not found"}, 404)
