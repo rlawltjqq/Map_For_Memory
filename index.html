@@ -159,13 +159,15 @@
     border: 1px solid #e8ecf0; border-radius: 10px; padding: 9px 10px;
     margin-bottom: 7px; background: #fff;
   }
-  .visit-top { display: flex; align-items: center; gap: 5px; margin-bottom: 6px; }
-  .visit-top .dlabel { font-size: 11px; color: #9ca3af; flex-shrink: 0; }
+  .visit-top { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; }
+  .visit-top .dlabel { font-size: 11.5px; color: #6b7280; font-weight: 600; }
+  .visit-top .dlabel em { font-style: normal; font-weight: 400; color: #b6bcc5; font-size: 10.5px; }
+  .visit-dates { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
   .visit-card input[type=date] {
-    flex: 1; min-width: 0; font-size: 12.5px; border: 1px solid #e2e8f0;
-    border-radius: 7px; padding: 6px 7px; color: #374151; background: #fff;
+    flex: 1; min-width: 0; font-size: 13px; border: 1px solid #e2e8f0;
+    border-radius: 7px; padding: 7px 8px; color: #374151; background: #fff;
   }
-  .visit-card .tilde { color: #9ca3af; font-size: 12px; flex-shrink: 0; }
+  .visit-card .tilde { color: #9ca3af; font-size: 13px; flex-shrink: 0; }
   .visit-card textarea {
     width: 100%; font-size: 13px; border: 1px solid #e2e8f0; border-radius: 7px;
     padding: 7px 8px; color: #374151; background: #fff; resize: vertical; line-height: 1.4;
@@ -1351,11 +1353,13 @@ function renderVisits() {
   list.innerHTML = visits.map((v, i) => `
     <div class="visit-card" data-i="${i}">
       <div class="visit-top">
-        <span class="dlabel">방문일</span>
-        <input type="date" class="v-start" value="${v.start}" max="2999-12-31">
-        <span class="tilde">~</span>
-        <input type="date" class="v-end" value="${v.end}" max="2999-12-31" title="여러 날 머물렀다면 마지막 날 (선택)">
+        <span class="dlabel">📅 방문일 <em>(하루면 시작일만)</em></span>
         <button class="visit-del" title="이 방문 기록 삭제">✕</button>
+      </div>
+      <div class="visit-dates">
+        <input type="date" class="v-start" value="${v.start}" max="2999-12-31" aria-label="시작일">
+        <span class="tilde">~</span>
+        <input type="date" class="v-end" value="${v.end}" max="2999-12-31" aria-label="종료일(선택)">
       </div>
       <textarea rows="2" maxlength="500" class="v-memo" placeholder="이때의 기억을 남겨보세요">${escapeHtml(v.memo)}</textarea>
     </div>`).join("");
