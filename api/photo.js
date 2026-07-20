@@ -24,6 +24,17 @@ export default async function handler(req, res) {
     return res.json({ ok: true, url: blob.url, name, vid: visitId });
   }
 
+  // 사진을 다른 방문 기록으로 이동 (vid="" 이면 미지정으로)
+  if (req.method === "PUT") {
+    const { url } = req.body || {};
+    const list = (await redis.hget(key, code)) || [];
+    const idx = list.findIndex((p) => p.url === url);
+    if (idx < 0) return res.status(404).json({ error: "not found" });
+    list[idx] = { ...list[idx], vid: visitId };
+    await redis.hset(key, { [code]: list });
+    return res.json({ ok: true, vid: visitId });
+  }
+
   if (req.method === "DELETE") {
     const { url } = req.body || {};
     const list = (await redis.hget(key, code)) || [];

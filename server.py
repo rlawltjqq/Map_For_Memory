@@ -257,6 +257,33 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_json({"error": "not found"}, 404)
 
     # ---------- DELETE ----------
+    # 사진을 다른 방문 기록으로 이동 (vid 없으면 미지정)
+    def do_PUT(self):
+        url = urlparse(self.path)
+        if url.path != "/api/photo":
+            self.send_json({"error": "not found"}, 404)
+            return
+        q = parse_qs(url.query)
+        room_id = (q.get("room") or [""])[0]
+        code = (q.get("code") or [""])[0]
+        vid_raw = (q.get("vid") or [""])[0]
+        visit_id = vid_raw if re.fullmatch(r"[\w-]{1,40}", vid_raw or "") else ""
+        target = self.read_json().get("url") or ""
+        with _lock:
+            rooms = load_rooms()
+            meta = self.auth(rooms, room_id)
+            if not meta:
+                self.send_json({"error": "unauthorized"}, 403)
+                return
+            files = meta.get("photos", {}).get(code, [])
+            item = next((p for p in files if p["url"] == target), None)
+            if not item:
+                self.send_json({"error": "not found"}, 404)
+                return
+            item["vid"] = visit_id
+            save_rooms(rooms)
+        self.send_json({"ok": True, "vid": visit_id})
+
     def do_DELETE(self):
         url = urlparse(self.path)
         if url.path != "/api/photo":

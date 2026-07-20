@@ -187,7 +187,39 @@
     background: rgba(0,0,0,.55); color: #fff; border: none; font-size: 10px; line-height: 1;
     cursor: pointer; display: none;
   }
-  .v-photos .ph:hover .del { display: block; }
+  .v-photos .ph:hover .del, .v-photos .ph:hover .mv { display: block; }
+  .v-photos .mv {
+    position: absolute; bottom: 2px; left: 2px; padding: 1px 5px; border-radius: 5px;
+    background: rgba(0,0,0,.55); color: #fff; border: none; font-size: 9.5px;
+    cursor: pointer; display: none;
+  }
+  /* 모바일은 hover가 없으므로 항상 노출 */
+  @media (hover: none) {
+    .v-photos .del, .v-photos .mv { display: block; }
+  }
+  /* 사진 이동 선택창 */
+  #movePicker {
+    position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none;
+    align-items: center; justify-content: center; z-index: 40; padding: 20px;
+  }
+  #movePicker.show { display: flex; }
+  #movePicker .card {
+    background: #fff; border-radius: 14px; padding: 18px; width: 100%; max-width: 340px;
+    max-height: 70vh; overflow-y: auto;
+  }
+  #movePicker h3 { font-size: 15px; margin-bottom: 12px; }
+  #moveList button {
+    display: block; width: 100%; text-align: left; padding: 10px 12px; margin-bottom: 6px;
+    border: 1px solid #e5e7eb; border-radius: 9px; background: #fff; font-size: 13px;
+    color: #374151; cursor: pointer;
+  }
+  #moveList button:hover { background: #f1f7f3; border-color: #3b9c6e; }
+  #moveList button.cur { background: #f1f7f3; border-color: #3b9c6e; color: #2d6a4f; font-weight: 600; }
+  #moveList .mv-memo { display: block; font-size: 11.5px; color: #9ca3af; margin-top: 2px; }
+  #moveCancel {
+    width: 100%; padding: 9px; margin-top: 4px; border: none; border-radius: 9px;
+    background: #f3f4f6; color: #4b5563; font-size: 13px; cursor: pointer;
+  }
   .v-addphoto {
     width: 100%; padding: 7px; font-size: 12px; border: 1px dashed #d7dde5;
     border-radius: 7px; background: #fff; color: #6b7280; cursor: pointer;
@@ -982,6 +1014,13 @@
 
 <div id="tooltip"></div>
 <div id="lightbox"><img alt=""></div>
+<div id="movePicker">
+  <div class="card">
+    <h3>어느 방문의 사진인가요?</h3>
+    <div id="moveList"></div>
+    <button id="moveCancel">취소</button>
+  </div>
+</div>
 
 <script>
 const PROV = {"39": "제주", "38": "경남", "37": "경북", "36": "전남", "35": "전북", "34": "충남", "33": "충북", "32": "강원", "31": "경기", "29": "세종", "26": "울산", "25": "대전", "24": "광주", "23": "인천", "22": "대구", "21": "부산", "11": "서울"};
@@ -1347,6 +1386,41 @@ $("rpToggle").onclick = () => { if (selected) { toggleVisited(selected); renderP
 // 저장 형태: notes[code] = { visits: [{start, end, memo}] }
 // 예전 형태({date, memo})는 읽을 때 자동 변환
 function newVid() { return "v" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+// ---- 사진을 다른 방문으로 옮기기 ----
+function openMovePicker(code, url) {
+  const cur = ((photos[code] || []).find(p => p.url === url) || {}).vid || "";
+  const vs = getVisits(code);
+  const rows = vs.map(v => {
+    const d = visitDateText(v) || "날짜 없는 방문";
+    const memo = v.memo ? `<span class="mv-memo">${escapeHtml(v.memo.slice(0, 30))}</span>` : "";
+    return `<button data-vid="${v.id}" class="${v.id === cur ? "cur" : ""}">${d}${memo}</button>`;
+  });
+  rows.push(`<button data-vid="" class="${cur ? "" : "cur"}">방문일 미지정</button>`);
+  if (!vs.length) {
+    rows.unshift(`<div class="mv-memo" style="margin-bottom:8px">먼저 '+ 방문 추가'로 방문 기록을 만들어 주세요.</div>`);
+  }
+  $("moveList").innerHTML = rows.join("");
+  $("moveList").querySelectorAll("button[data-vid]").forEach(b => {
+    b.onclick = () => movePhoto(code, url, b.dataset.vid);
+  });
+  $("movePicker").classList.add("show");
+}
+$("moveCancel").onclick = () => $("movePicker").classList.remove("show");
+$("movePicker").onclick = (e) => { if (e.target.id === "movePicker") $("movePicker").classList.remove("show"); };
+async function movePhoto(code, url, vid) {
+  $("movePicker").classList.remove("show");
+  try {
+    await api(`/api/photo?room=${ROOM}&code=${code}&vid=${encodeURIComponent(vid)}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url })
+    });
+    const p = (photos[code] || []).find(x => x.url === url);
+    if (p) p.vid = vid;
+    renderPanel(); renderFeed();
+    setBadge(true);
+  } catch { alert("옮기지 못했어요. 다시 시도해 주세요."); setBadge(false); }
+}
 function normVisits(raw) {
   if (!raw) return [];
   if (Array.isArray(raw.visits)) return raw.visits.map(v => ({
@@ -1368,7 +1442,8 @@ function photoGridHtml(list) {
   if (!list.length) return "";
   return `<div class="v-photos">${list.map(p =>
     `<div class="ph"><img src="${p.url}" alt="${escapeHtml(p.name || "")}" loading="lazy" data-full="${p.url}">` +
-    `<button class="del" data-url="${p.url}" title="삭제">✕</button></div>`).join("")}</div>`;
+    `<button class="del" data-url="${p.url}" title="삭제">✕</button>` +
+    `<button class="mv" data-url="${p.url}" title="다른 방문으로 옮기기">이동</button></div>`).join("")}</div>`;
 }
 // 그리드 안의 사진 클릭(확대)·삭제 연결
 function wirePhotoGrid(root, code) {
@@ -1378,6 +1453,9 @@ function wirePhotoGrid(root, code) {
       $("lightbox").style.display = "flex";
       $("lightbox").querySelector("img").src = img.dataset.full;
     };
+  });
+  root.querySelectorAll("button.mv[data-url]").forEach(btn => {
+    btn.onclick = (ev) => { ev.stopPropagation(); openMovePicker(code, btn.dataset.url); };
   });
   root.querySelectorAll("button.del[data-url]").forEach(btn => {
     btn.onclick = async (ev) => {
