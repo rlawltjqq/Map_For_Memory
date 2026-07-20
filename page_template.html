@@ -449,12 +449,20 @@ function rememberRoom(id, name, token) {
 }
 
 // ---- API ----
+// 쓰기 요청 추적 — 폴링이 방금 저장한 내용을 덮어쓰지 않게 하기 위함
+let inflightWrites = 0, lastWriteAt = 0;
 async function api(path, opts = {}) {
+  const isWrite = !!opts.method && opts.method !== "GET";
+  if (isWrite) inflightWrites++;
   opts.headers = Object.assign({ "x-token": TOKEN || "" }, opts.headers || {});
-  const r = await fetch(path, opts);
-  const body = await r.json().catch(() => ({}));
-  if (!r.ok) throw Object.assign(new Error(body.error || r.status), { status: r.status });
-  return body;
+  try {
+    const r = await fetch(path, opts);
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw Object.assign(new Error(body.error || r.status), { status: r.status });
+    return body;
+  } finally {
+    if (isWrite) { inflightWrites--; lastWriteAt = Date.now(); }
+  }
 }
 function setBadge(on, text) {
   const b = $("syncBadge");
@@ -526,6 +534,11 @@ function applyState(s) {
   if (selected) renderPanel();
 }
 async function refresh() {
+  // 저장 중이거나 방금 저장했으면 건너뜀 (서버 응답이 뒤늦게 와서 로컬 편집을 지우는 것 방지)
+  if (inflightWrites > 0 || Date.now() - lastWriteAt < 4000) return;
+  // 입력 중이면 건너뜀 (타이핑하던 메모가 사라지지 않게)
+  const ae = document.activeElement;
+  if (ae && regionPanelEl && regionPanelEl.contains(ae)) return;
   try {
     applyState(await api(`/api/state?room=${ROOM}`));
     setBadge(true);
