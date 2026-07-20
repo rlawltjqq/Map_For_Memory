@@ -1429,7 +1429,23 @@ function normVisits(raw) {
   if (raw.date || raw.memo) return [{ id: newVid(), start: raw.date || "", end: "", memo: raw.memo || "" }];
   return [];
 }
-function getVisits(code) { return normVisits(notes[code]); }
+function getVisits(code) {
+  const raw = notes[code];
+  const vs = normVisits(raw);
+  // 예전 데이터엔 방문 ID가 없어 매번 새로 생기므로, 한 번 부여하고 고정한다
+  // (고정하지 않으면 사진-방문 연결이 계속 어긋남)
+  const missing = vs.length && (!raw || !Array.isArray(raw.visits) || raw.visits.some(v => !v.id));
+  if (missing) {
+    notes[code] = { visits: vs };
+    if (ROOM) {
+      api("/api/note", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ room: ROOM, code, visits: vs })
+      }).catch(() => {});
+    }
+  }
+  return vs;
+}
 // 방문별 사진 / 방문일 미지정 사진
 function photosOfVisit(code, vid) {
   return (photos[code] || []).filter(p => (p.vid || "") === vid);
