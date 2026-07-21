@@ -127,55 +127,56 @@ def process(data):
     return img
 
 
-with open("japan_meta.json", encoding="utf-8") as f:
-    names = json.load(f)["names"]          # code -> 한국어 이름
-code_of = {v: k for k, v in names.items()}
+if __name__ == "__main__":
+    with open("japan_meta.json", encoding="utf-8") as f:
+        names = json.load(f)["names"]          # code -> 한국어 이름
+    code_of = {v: k for k, v in names.items()}
 
-texts = export_wikitexts(list(code_of.keys()))
-picked = {}
-for name, code in code_of.items():
-    wt = texts.get(name, "")
-    for key in ("문장", "휘장", "기"):
-        m = FILE_RE[key].search(wt)
-        if m:
-            fn = m.group(1).strip().replace("_", " ")
-            if re.search(r"\.(svg|png|jpe?g|gif)$", fn, re.I):
-                picked[code] = fn
-                break
-print(f"문장 파일 확보: {len(picked)}/{len(code_of)}")
-missing = [n for n, c in code_of.items() if c not in picked]
-if missing:
-    print("미확보:", ", ".join(missing))
+    texts = export_wikitexts(list(code_of.keys()))
+    picked = {}
+    for name, code in code_of.items():
+        wt = texts.get(name, "")
+        for key in ("문장", "휘장", "기"):
+            m = FILE_RE[key].search(wt)
+            if m:
+                fn = m.group(1).strip().replace("_", " ")
+                if re.search(r"\.(svg|png|jpe?g|gif)$", fn, re.I):
+                    picked[code] = fn
+                    break
+    print(f"문장 파일 확보: {len(picked)}/{len(code_of)}")
+    missing = [n for n, c in code_of.items() if c not in picked]
+    if missing:
+        print("미확보:", ", ".join(missing))
 
-try:
-    with open("emblems.json", encoding="utf-8") as f:
-        emblems = json.load(f)
-except FileNotFoundError:
-    emblems = {}
-
-ok, fail = 0, []
-for i, (code, fn) in enumerate(sorted(picked.items())):
-    out_path = os.path.join(OUT_DIR, f"{code}.png")
-    if os.path.exists(out_path):
-        emblems[code] = f"emblems/{code}.png"
-        ok += 1
-        continue
     try:
-        url = thumb_url(fn)
-        if not url:
-            fail.append((code, "no thumb"))
-            continue
-        process(http_get(url)).save(out_path)
-        emblems[code] = f"emblems/{code}.png"
-        ok += 1
-    except Exception as e:
-        fail.append((code, str(e)[:50]))
-    time.sleep(1.2)
-    if (i + 1) % 15 == 0:
-        print(f"{i + 1}/{len(picked)} 처리 (성공 {ok})")
+        with open("emblems.json", encoding="utf-8") as f:
+            emblems = json.load(f)
+    except FileNotFoundError:
+        emblems = {}
 
-with open("emblems.json", "w", encoding="utf-8") as f:
-    json.dump(emblems, f, ensure_ascii=False, indent=1)
-print(f"완료: {ok}/{len(picked)}")
-if fail:
-    print("실패:", fail)
+    ok, fail = 0, []
+    for i, (code, fn) in enumerate(sorted(picked.items())):
+        out_path = os.path.join(OUT_DIR, f"{code}.png")
+        if os.path.exists(out_path):
+            emblems[code] = f"emblems/{code}.png"
+            ok += 1
+            continue
+        try:
+            url = thumb_url(fn)
+            if not url:
+                fail.append((code, "no thumb"))
+                continue
+            process(http_get(url)).save(out_path)
+            emblems[code] = f"emblems/{code}.png"
+            ok += 1
+        except Exception as e:
+            fail.append((code, str(e)[:50]))
+        time.sleep(1.2)
+        if (i + 1) % 15 == 0:
+            print(f"{i + 1}/{len(picked)} 처리 (성공 {ok})")
+
+    with open("emblems.json", "w", encoding="utf-8") as f:
+        json.dump(emblems, f, ensure_ascii=False, indent=1)
+    print(f"완료: {ok}/{len(picked)}")
+    if fail:
+        print("실패:", fail)
