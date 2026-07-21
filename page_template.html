@@ -117,6 +117,7 @@
   .g-munis path.selected { stroke: #2d6a4f; stroke-width: 1.8px; }
   .g-provinces path { vector-effect: non-scaling-stroke; stroke-width: 1.3px; }
   .g-labels text.on-visited { fill: #1b4332; }
+  .g-labels text.sel-label { fill: #14532d; font-weight: 700; }
   .zoom-btns { position: absolute; right: 14px; bottom: 14px; display: flex; flex-direction: column; gap: 6px; }
   .zoom-btns button {
     width: 38px; height: 38px; border: 1px solid #d1d5db; background: #fff; border-radius: 8px;
@@ -1449,15 +1450,17 @@ function updateLabels() {
       (parseFloat(a.dataset.w) * parseFloat(a.dataset.h || a.dataset.w)));
     for (const t of order) {
       const nameLen = t.textContent.length;
+      const isSel = t.dataset.code === selected;
+      // 선택한 지역은 작아도(폭이 좁아도) 이름을 보여준다
       const fits = parseFloat(t.dataset.w) * pxPerUnit > nameLen * 11 + 8;
-      if (!fits) { labelShownMap[t.dataset.code] = false; continue; }
+      if (!fits && !isSel) { labelShownMap[t.dataset.code] = false; continue; }
       const cxU = +t.getAttribute("x"), cyU = +t.getAttribute("y");
       const sx = rect.left + (cxU - vb.x) / vb.w * rect.width;
       const sy = rect.top + (cyU - vb.y) / vb.h * rect.height;
       const halfW = nameLen * 11 / 2 + 4, halfH = 9;
       const box = { l: sx - halfW, t: sy - halfH, r: sx + halfW, b: sy + halfH };
       // 선택한 지역 이름은 겹쳐도 항상 표시 (어느 지역인지 헷갈리지 않게)
-      const hit = t.dataset.code !== selected &&
+      const hit = !isSel &&
         placed.some(p => !(box.r < p.l || box.l > p.r || box.b < p.t || box.t > p.b));
       if (hit) { labelShownMap[t.dataset.code] = false; }
       else { labelShownMap[t.dataset.code] = true; placed.push(box); }
@@ -1467,7 +1470,10 @@ function updateLabels() {
   muniTexts.forEach(t => {
     const labelShown = showMuni && !!labelShownMap[t.dataset.code];
     t.style.display = labelShown ? "" : "none";
-    if (labelShown) t.classList.toggle("on-visited", visited.has(t.dataset.code));
+    if (labelShown) {
+      t.classList.toggle("on-visited", visited.has(t.dataset.code));
+      t.classList.toggle("sel-label", t.dataset.code === selected);
+    }
     if (!visited.has(t.dataset.code)) return;
     const x = +t.getAttribute("x");
     const y = +t.getAttribute("y");
