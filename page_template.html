@@ -92,19 +92,31 @@
     flex: 1; position: relative; overflow: hidden; touch-action: none;
     background: linear-gradient(180deg, #eaf2fa 0%, #f4f6f9 100%);
   }
-  #map { width: 100%; height: 100%; display: block; cursor: grab; }
-  #map.dragging { cursor: grabbing; }
+  .mapsvg { width: 100%; height: 100%; display: block; cursor: grab; }
+  .mapsvg.dragging { cursor: grabbing; }
+  .mapsvg.hidden { display: none; }
+  /* 나라 전환 */
+  #countrySwitch {
+    position: absolute; top: 10px; right: 14px; z-index: 6; display: flex; gap: 4px;
+    background: rgba(255,255,255,.93); border: 1px solid #e5e7eb; border-radius: 999px;
+    padding: 3px; box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  #countrySwitch button {
+    border: none; background: none; padding: 5px 12px; border-radius: 999px;
+    font-size: 12.5px; color: #6b7280; cursor: pointer;
+  }
+  #countrySwitch button.active { background: #3b9c6e; color: #fff; font-weight: 600; }
   /* 경계선을 줌과 무관하게 항상 얇게 (non-scaling-stroke) */
-  #municipalities path {
+  .g-munis path {
     transition: fill .15s; cursor: pointer;
     vector-effect: non-scaling-stroke; stroke-width: 0.7px;
   }
-  #municipalities path:hover { fill: #e3f2e9; }
-  #municipalities path.visited { fill: #b7e4c7; }
-  #municipalities path.visited:hover { fill: #a4dcb8; }
-  #municipalities path.selected { stroke: #2d6a4f; stroke-width: 1.8px; }
-  #provinces path { vector-effect: non-scaling-stroke; stroke-width: 1.3px; }
-  #muniLabels text.on-visited { fill: #1b4332; }
+  .g-munis path:hover { fill: #e3f2e9; }
+  .g-munis path.visited { fill: #b7e4c7; }
+  .g-munis path.visited:hover { fill: #a4dcb8; }
+  .g-munis path.selected { stroke: #2d6a4f; stroke-width: 1.8px; }
+  .g-provinces path { vector-effect: non-scaling-stroke; stroke-width: 1.3px; }
+  .g-labels text.on-visited { fill: #1b4332; }
   .zoom-btns { position: absolute; right: 14px; bottom: 14px; display: flex; flex-direction: column; gap: 6px; }
   .zoom-btns button {
     width: 38px; height: 38px; border: 1px solid #d1d5db; background: #fff; border-radius: 8px;
@@ -424,7 +436,12 @@
   </header>
   <div class="layout">
     <div class="map-wrap" id="mapWrap">
+      <div id="countrySwitch">
+        <button data-country="kr" class="active">🇰🇷 한국</button>
+        <button data-country="jp">🇯🇵 일본</button>
+      </div>
       __SVG__
+      __SVG_JP__
       <div class="zoom-btns">
         <button id="zoomIn" title="확대">+</button>
         <button id="zoomOut" title="축소">−</button>
@@ -436,7 +453,7 @@
     <aside>
       <div class="big-stat">
         <div class="pct" id="pct">0%</div>
-        <div class="cnt"><span id="cnt">0</span> / <span id="total">0</span> 시·군·구</div>
+        <div class="cnt"><span id="cnt">0</span> / <span id="total">0</span> <span id="unitLabel">시·군·구</span></div>
       </div>
       <div class="total-bar"><div id="totalBar"></div></div>
 
@@ -508,23 +525,59 @@
 </div>
 
 <script>
-const PROV = __PROV__;
-const EMBLEMS = __EMBLEMS__;   // 시·군·구 코드 → 공식 휘장(심벌) 이미지 URL
-const svg = document.getElementById("map");
-const paths = [...svg.querySelectorAll("#municipalities path")];
-const muniTexts = [...svg.querySelectorAll("#muniLabels text")];
-const provLabelsG = svg.querySelector("#provLabels");
+const PROV_KR = __PROV__;
+const PROV_JP = __PROV_JP__;
+const PROV = Object.assign({}, PROV_KR, PROV_JP);   // 코드 앞 2자리 → 시·도 / 지방
+const EMBLEMS = __EMBLEMS__;   // 지역 코드 → 공식 휘장(심벌) 이미지 URL
 const tooltip = document.getElementById("tooltip");
 const $ = id => document.getElementById(id);
 
+// ---- 나라별 지도 ----
+const MAPS = {};
+["kr", "jp"].forEach(cc => {
+  const el = document.getElementById(cc === "kr" ? "map" : "mapJp");
+  const vb0 = el.viewBox.baseVal;
+  const home = { x: vb0.x, y: vb0.y, w: vb0.width, h: vb0.height };
+  const ps = [...el.querySelectorAll(".g-munis path")];
+  const marks = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  marks.setAttribute("pointer-events", "none");
+  el.insertBefore(marks, el.querySelector(".g-labels"));
+  const byCode = {};
+  ps.forEach(p => { byCode[p.dataset.code] = p; });
+  MAPS[cc] = {
+    cc, svg: el, paths: ps,
+    muniTexts: [...el.querySelectorAll(".g-labels text")],
+    provLabelsG: el.querySelector(".g-provlabels"),
+    marksG: marks, pathByCode: byCode, bboxCache: {},
+    home, vb: { ...home },
+    labelAt: cc === "jp" ? Infinity : 620,   // 이 폭 이하로 확대하면 지역명 표시
+  };
+});
+let COUNTRY = "kr";
+// 활성 지도 참조 (나라를 바꾸면 다시 바인딩)
+let svg, paths, muniTexts, provLabelsG, marksG, pathByCode, bboxCache, home, vb;
+function bindMap(cc) {
+  const m = MAPS[cc];
+  COUNTRY = cc;
+  svg = m.svg; paths = m.paths; muniTexts = m.muniTexts; provLabelsG = m.provLabelsG;
+  marksG = m.marksG; pathByCode = m.pathByCode; bboxCache = m.bboxCache;
+  home = m.home; vb = m.vb;
+}
+bindMap("kr");
+// 시작은 한국 지도만 보이게
+Object.values(MAPS).forEach(m => m.svg.classList.toggle("hidden", m.cc !== COUNTRY));
+const MAPSVGS = Object.values(MAPS).map(m => m.svg);
+// 지역명·소속은 두 나라를 합쳐서 참조 (검색·앨범용)
+const nameByCode = {};
+Object.values(MAPS).forEach(m => m.paths.forEach(p => { nameByCode[p.dataset.code] = p.dataset.name; }));
+const countryOfCode = code => (String(code).length === 5 && String(code)[0] === "9") ? "jp" : "kr";
+
 let ROOM = null, TOKEN = null;
 let visited = new Set();
-let photos = {};   // code -> [{url, name}]
-let notes = {};    // code -> {date, memo}
+let photos = {};   // code -> [{url, name, vid}]
+let notes = {};    // code -> {visits:[...]}
 let selected = null;
 let pollTimer = null;
-const nameByCode = {};
-paths.forEach(p => { nameByCode[p.dataset.code] = p.dataset.name; });
 
 // 접속한 적 있는 지도 목록: {id: {name, token}}
 const savedRooms = JSON.parse(localStorage.getItem("travelRooms") || "{}");
@@ -675,14 +728,14 @@ async function buildMapImage() {
   const clone = svg.cloneNode(true);
   clone.setAttribute("viewBox", `0 0 ${W} ${H}`);
   clone.removeAttribute("id");
-  clone.querySelectorAll("#municipalities path").forEach(p => {
+  clone.querySelectorAll(".g-munis path").forEach(p => {
     p.classList.remove("visited", "selected");
     p.setAttribute("fill", visited.has(p.dataset.code) ? "#b7e4c7" : "#ffffff");
     p.setAttribute("stroke", "#c6cfd9");
     p.setAttribute("stroke-width", "0.55");
   });
   // 라벨은 전국 뷰에서 겹치므로 제거, 마커만 다시 그림
-  const cLabels = clone.querySelector("#muniLabels"); if (cLabels) cLabels.remove();
+  const cLabels = clone.querySelector(".g-labels"); if (cLabels) cLabels.remove();
   const cMarks = clone.querySelector("#visitMarks"); if (cMarks) cMarks.remove();
   // 방문 심벌을 지역 중심에 data URI로 배치
   const markG = document.createElementNS("http://www.w3.org/2000/svg", "g");
@@ -770,7 +823,7 @@ $("saveBtn").onclick = async () => {
 // 탭 위치의 지역을 찾되, 정확히 못 맞히면 화면상 가장 가까운 지역으로 스냅 (작은 구 대응)
 function regionAt(clientX, clientY) {
   const el = document.elementFromPoint(clientX, clientY);
-  if (el && el.parentElement && el.parentElement.id === "municipalities" && el.dataset.code)
+  if (el && el.parentElement && el.parentElement.classList.contains("g-munis") && el.dataset.code)
     return el.dataset.code;
   const r = svg.getBoundingClientRect();
   if (!r.width) return null;
@@ -1212,23 +1265,26 @@ paths.forEach(p => {
   p.addEventListener("pointerleave", () => { tooltip.style.display = "none"; });
 });
 
-// ---- 통계 ----
-const provCodes = Object.keys(PROV);
-const provTotals = {};
-paths.forEach(p => {
-  const pc = p.dataset.code.slice(0, 2);
-  provTotals[pc] = (provTotals[pc] || 0) + 1;
-});
-$("total").textContent = paths.length;
-const provList = $("provList");
-provCodes.forEach(pc => {
-  const row = document.createElement("div");
-  row.className = "prov-row"; row.id = "prov-" + pc;
-  row.innerHTML = `<span class="name">${PROV[pc]}</span><div class="bar"><div></div></div><span class="num"></span>`;
-  provList.appendChild(row);
-});
+// ---- 통계 (현재 보고 있는 나라 기준) ----
+let provCodes = [], provTotals = {};
+function buildProvList() {
+  provTotals = {};
+  paths.forEach(p => {
+    const pc = p.dataset.code.slice(0, 2);
+    provTotals[pc] = (provTotals[pc] || 0) + 1;
+  });
+  provCodes = Object.keys(provTotals).sort();
+  $("total").textContent = paths.length;
+  $("statsHead").textContent = COUNTRY === "jp" ? "지방별 달성률" : "시·도별 달성률";
+  $("unitLabel").textContent = COUNTRY === "jp" ? "도도부현" : "시·군·구";
+  $("provList").innerHTML = provCodes.map(pc =>
+    `<div class="prov-row" id="prov-${pc}"><span class="name">${PROV[pc] || ""}</span>` +
+    `<div class="bar"><div></div></div><span class="num"></span></div>`).join("");
+}
 function render() {
-  const n = visited.size;
+  // 방문 수는 현재 나라 기준으로만 집계
+  let n = 0;
+  visited.forEach(c => { if (countryOfCode(c) === COUNTRY) n++; });
   $("cnt").textContent = n;
   const pct = paths.length ? n / paths.length * 100 : 0;
   const pctText = (pct > 0 && pct < 10 ? pct.toFixed(1) : Math.round(pct)) + "%";
@@ -1239,29 +1295,38 @@ function render() {
   visited.forEach(c => { const pc = c.slice(0, 2); pv[pc] = (pv[pc] || 0) + 1; });
   provCodes.forEach(pc => {
     const row = $("prov-" + pc);
+    if (!row) return;
     const v = pv[pc] || 0, t = provTotals[pc] || 0;
     row.querySelector(".bar > div").style.width = (t ? v / t * 100 : 0) + "%";
     row.querySelector(".num").textContent = `${v}/${t}`;
     row.classList.toggle("done", v === t && t > 0);
   });
 }
+buildProvList();
 
 // ---- 확대/이동 + 라벨 표시 ----
-const VB0 = svg.viewBox.baseVal;
-const home = { x: VB0.x, y: VB0.y, w: VB0.width, h: VB0.height };
-let vb = { ...home };
 function applyVB() {
   svg.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
   updateLabels();
 }
-// 방문 마커 오버레이 (라벨 좌표 재사용) — 지역명이 위에 오도록 라벨 아래 레이어에 삽입
-const marksG = document.createElementNS("http://www.w3.org/2000/svg", "g");
-marksG.id = "visitMarks";
-marksG.setAttribute("pointer-events", "none");
-svg.insertBefore(marksG, svg.querySelector("#muniLabels"));
-const pathByCode = {};
-paths.forEach(p => { pathByCode[p.dataset.code] = p; });
-const bboxCache = {};
+// 나라 전환
+function setCountry(cc) {
+  if (!MAPS[cc] || cc === COUNTRY) return;
+  bindMap(cc);
+  Object.values(MAPS).forEach(m => m.svg.classList.toggle("hidden", m.cc !== cc));
+  document.querySelectorAll("#countrySwitch button").forEach(b =>
+    b.classList.toggle("active", b.dataset.country === cc));
+  // 선택 해제 후 활성 지도 기준으로 다시 그림
+  selected = null;
+  $("rpHint").style.display = "";
+  $("rpBody").style.display = "none";
+  if (mq.matches) regionPanelEl.classList.remove("open");
+  buildProvList();
+  render(); applyVB();
+}
+document.querySelectorAll("#countrySwitch button").forEach(b => {
+  b.onclick = () => setCountry(b.dataset.country);
+});
 function regionBBox(code) {
   // 숨겨진 상태(getBBox=0)는 캐시하지 않아 나중에 다시 정확히 측정
   if ((!bboxCache[code] || !bboxCache[code].width) && pathByCode[code]) {
@@ -1274,6 +1339,7 @@ function regionBBox(code) {
 // 앨범 카드 → 해당 지역으로 지도 이동 + 선택
 function focusRegion(code) {
   setTab("map");
+  setCountry(countryOfCode(code));   // 다른 나라 지역이면 지도부터 전환
   const bb = regionBBox(code);
   if (bb && bb.width) {
     const cx = bb.x + bb.width / 2, cy = bb.y + bb.height / 2;
@@ -1288,12 +1354,13 @@ function focusRegion(code) {
   select(code);
 }
 
-// ---- 지역 검색 ----
-const searchIndex = paths.map(p => ({
+// ---- 지역 검색 (한국·일본 모두) ----
+const searchIndex = Object.values(MAPS).flatMap(m => m.paths.map(p => ({
   code: p.dataset.code,
   name: p.dataset.name,
-  prov: PROV[p.dataset.code.slice(0, 2)] || ""
-}));
+  prov: PROV[p.dataset.code.slice(0, 2)] || "",
+  cc: m.cc
+})));
 const searchInput = $("searchInput");
 const searchResults = $("searchResults");
 let srActive = -1, srItems = [];
@@ -1310,7 +1377,8 @@ function runSearch(q) {
     else if (full.includes(q)) score = 2;
     if (score >= 0) scored.push({ ...r, score });
   }
-  scored.sort((a, b) => a.score - b.score || a.name.localeCompare(b.name));
+  scored.sort((a, b) => (a.cc === COUNTRY ? 0 : 1) - (b.cc === COUNTRY ? 0 : 1)
+    || a.score - b.score || a.name.localeCompare(b.name));
   srItems = scored.slice(0, 12);
   srActive = srItems.length ? 0 : -1;
   if (!srItems.length) {
@@ -1322,7 +1390,7 @@ function runSearch(q) {
       return `<div class="sr-item${i === srActive ? " active" : ""}" data-code="${r.code}" data-i="${i}">
         ${em ? `<img src="${em}" alt="">` : ""}
         <span>${escapeHtml(r.name)}</span> ${vis}
-        <span class="sr-prov">${r.prov}</span>
+        <span class="sr-prov">${r.cc === "jp" ? "🇯🇵 " : ""}${r.prov}</span>
       </div>`;
     }).join("");
     searchResults.querySelectorAll(".sr-item").forEach(el => {
@@ -1364,9 +1432,9 @@ function updateLabels() {
   const rect = svg.getBoundingClientRect();
   if (!rect.width) return;
   const pxPerUnit = rect.width / vb.w;
-  svg.querySelector("#muniLabels").style.fontSize = (11 / pxPerUnit) + "px";
+  svg.querySelector(".g-labels").style.fontSize = (11 / pxPerUnit) + "px";
   provLabelsG.style.fontSize = (13 / pxPerUnit) + "px";
-  const showMuni = vb.w <= 620;
+  const showMuni = vb.w <= MAPS[COUNTRY].labelAt;
   provLabelsG.style.display = showMuni ? "none" : "";
 
   // --- 어떤 시·군·구 이름을 보일지: 큰 지역 우선 + 겹치면 숨김 ---
@@ -1459,11 +1527,11 @@ function clientToSvg(e) {
   return [vb.x + (e.clientX - r.left) / r.width * vb.w,
           vb.y + (e.clientY - r.top) / r.height * vb.h];
 }
-svg.addEventListener("wheel", e => {
+MAPSVGS.forEach(el => el.addEventListener("wheel", e => {
   e.preventDefault();
   const [cx, cy] = clientToSvg(e);
   zoomAt(cx, cy, e.deltaY > 0 ? 1.2 : 1 / 1.2);
-}, { passive: false });
+}, { passive: false }));
 $("zoomIn").onclick = () => zoomAt(vb.x + vb.w / 2, vb.y + vb.h / 2, 1 / 1.4);
 $("zoomOut").onclick = () => zoomAt(vb.x + vb.w / 2, vb.y + vb.h / 2, 1.4);
 $("zoomReset").onclick = () => { vb = { ...home }; applyVB(); };
@@ -1472,7 +1540,7 @@ window.addEventListener("resize", updateLabels);
 const pointers = new Map();
 let pinchDist = 0;
 let tapStart = null, tapMoved = false;   // 탭 판정용
-svg.addEventListener("pointerdown", e => {
+MAPSVGS.forEach(el => el.addEventListener("pointerdown", e => {
   pointers.set(e.pointerId, e);
   if (pointers.size === 1) { tapStart = [e.clientX, e.clientY]; tapMoved = false; }
   else { tapStart = null; }   // 멀티터치면 탭 아님
@@ -1480,9 +1548,9 @@ svg.addEventListener("pointerdown", e => {
     const [a, b] = [...pointers.values()];
     pinchDist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
   }
-  svg.setPointerCapture(e.pointerId);
-});
-svg.addEventListener("pointermove", e => {
+  el.setPointerCapture(e.pointerId);
+}));
+MAPSVGS.forEach(el => el.addEventListener("pointermove", e => {
   if (!pointers.has(e.pointerId)) return;
   const prev = pointers.get(e.pointerId);
   pointers.set(e.pointerId, e);
@@ -1491,7 +1559,7 @@ svg.addEventListener("pointermove", e => {
     if (tapStart && Math.hypot(e.clientX - tapStart[0], e.clientY - tapStart[1]) > 8) tapMoved = true;
     const dx = (e.clientX - prev.clientX) / r.width * vb.w;
     const dy = (e.clientY - prev.clientY) / r.height * vb.h;
-    if (dx || dy) { svg.classList.add("dragging"); vb.x -= dx; vb.y -= dy; applyVB(); }
+    if (dx || dy) { el.classList.add("dragging"); vb.x -= dx; vb.y -= dy; applyVB(); }
   } else if (pointers.size === 2) {
     const [a, b] = [...pointers.values()];
     const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
@@ -1503,16 +1571,16 @@ svg.addEventListener("pointermove", e => {
       pinchDist = d;
     }
   }
-});
-["pointerup", "pointercancel"].forEach(ev => svg.addEventListener(ev, e => {
+}));
+["pointerup","pointercancel"].forEach(ev => MAPSVGS.forEach(el => el.addEventListener(ev, e => {
   // 단일 탭(거의 안 움직임)이면 지역 선택
   if (ev === "pointerup" && tapStart && !tapMoved && pointers.size === 1) {
     handleTap(e.clientX, e.clientY);
   }
   pointers.delete(e.pointerId);
-  if (pointers.size === 0) { svg.classList.remove("dragging"); tapStart = null; }
+  if (pointers.size === 0) { el.classList.remove("dragging"); tapStart = null; }
   pinchDist = 0;
-}));
+})));
 
 // ---- 내보내기 / 가져오기 / 초기화 ----
 // 전체 초기화 — 지도 비밀번호 확인 후 실행 (서버에서 검증)

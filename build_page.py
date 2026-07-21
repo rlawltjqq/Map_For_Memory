@@ -3,10 +3,23 @@
 import json
 import re
 
+def prep_svg(text, svg_id):
+    """페이지용으로 svg 태그 정리 + 그룹에 공통 class 부여(나라별 id 충돌 방지)"""
+    text = text.replace('width="800" height="1100"', f'id="{svg_id}" class="mapsvg"', 1)
+    for gid, cls in (("municipalities", "g-munis"), ("provinces", "g-provinces"),
+                     ("muniLabels", "g-labels"), ("provLabels", "g-provlabels")):
+        text = text.replace(f'<g id="{gid}"', f'<g class="{cls}"', 1)
+    return text
+
+
 with open("korea_sigungu_map.svg", encoding="utf-8") as f:
-    svg = f.read()
-# 페이지에 맞게 svg 태그의 고정 width/height 제거 (viewBox만 유지)
-svg = svg.replace(f'width="800" height="1100"', 'id="map"', 1)
+    svg = prep_svg(f.read(), "map")
+
+with open("japan_map.svg", encoding="utf-8") as f:
+    svg_jp = prep_svg(f.read(), "mapJp")
+
+with open("japan_meta.json", encoding="utf-8") as f:
+    jp_meta = json.load(f)
 
 with open("korea_provinces.geojson", encoding="utf-8") as f:
     prov_gj = json.load(f)
@@ -41,8 +54,10 @@ emblems = {
 }
 
 html = html.replace("__PROV__", json.dumps(prov_short, ensure_ascii=False))
+html = html.replace("__PROV_JP__", json.dumps(jp_meta["regions"], ensure_ascii=False))
 html = html.replace("__EMBLEMS__", json.dumps(emblems, ensure_ascii=False))
 html = html.replace("__SVG__", svg)
+html = html.replace("__SVG_JP__", svg_jp)
 
 with open("index.html", "w", encoding="utf-8") as f:
     f.write(html)
