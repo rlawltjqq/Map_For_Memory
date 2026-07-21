@@ -570,7 +570,9 @@ const MAPSVGS = Object.values(MAPS).map(m => m.svg);
 // 지역명·소속은 두 나라를 합쳐서 참조 (검색·앨범용)
 const nameByCode = {};
 Object.values(MAPS).forEach(m => m.paths.forEach(p => { nameByCode[p.dataset.code] = p.dataset.name; }));
-const countryOfCode = code => (String(code).length === 5 && String(code)[0] === "9") ? "jp" : "kr";
+const countryOfCode = code => String(code)[0] === "9" ? "jp" : "kr";
+// 통계 그룹: 도쿄 시·구(6자리)는 "9T", 그 외는 코드 앞 2자리
+const groupOf = c => { c = String(c); return c.length === 6 ? "9T" : c.slice(0, 2); };
 
 let ROOM = null, TOKEN = null;
 let visited = new Set();
@@ -890,6 +892,7 @@ layoutMode();
 
 // ---- 선택 지역 패널 ----
 function select(code) {
+  setCountry(countryOfCode(code));   // 다른 나라 지역이면 지도부터 전환
   selected = code;
   dismissFirstHint();
   paths.forEach(p => p.classList.toggle("selected", p.dataset.code === code));
@@ -902,7 +905,7 @@ function renderPanel() {
   $("rpHint").style.display = "none";
   $("rpBody").style.display = "";
   $("rpName").textContent = p.dataset.name;
-  $("rpProv").textContent = PROV[selected.slice(0, 2)] || "";
+  $("rpProv").textContent = PROV[groupOf(selected)] || "";
   const emblem = EMBLEMS[selected];
   $("rpEmblem").style.display = emblem ? "block" : "none";
   if (emblem) $("rpEmblem").src = emblem;
@@ -1147,7 +1150,7 @@ function renderFeed() {
   entries.sort((a, b) => b.latest.localeCompare(a.latest));
   feed.innerHTML = entries.map(e => {
     const emblem = EMBLEMS[e.code];
-    const prov = PROV[e.code.slice(0, 2)] || "";
+    const prov = PROV[groupOf(e.code)] || "";
     const name = nameByCode[e.code] || "";
     const countHtml = e.visits.length > 1
       ? `<span class="mem-count">${e.visits.length}번 방문</span>` : "";
@@ -1254,7 +1257,7 @@ $("lightbox").onclick = () => { $("lightbox").style.display = "none"; };
 paths.forEach(p => {
   p.addEventListener("pointermove", e => {
     const code = p.dataset.code;
-    const prov = PROV[code.slice(0, 2)] || "";
+    const prov = PROV[groupOf(code)] || "";
     const mark = visited.has(code) ? ' <span class="v">✓ 방문</span>' : "";
     const ph = (photos[code] || []).length;
     tooltip.innerHTML = `${prov} ${p.dataset.name}${mark}${ph ? ` · 사진 ${ph}` : ""}`;
@@ -1270,13 +1273,13 @@ let provCodes = [], provTotals = {};
 function buildProvList() {
   provTotals = {};
   paths.forEach(p => {
-    const pc = p.dataset.code.slice(0, 2);
+    const pc = groupOf(p.dataset.code);
     provTotals[pc] = (provTotals[pc] || 0) + 1;
   });
   provCodes = Object.keys(provTotals).sort();
   $("total").textContent = paths.length;
   $("statsHead").textContent = COUNTRY === "jp" ? "지방별 달성률" : "시·도별 달성률";
-  $("unitLabel").textContent = COUNTRY === "jp" ? "도도부현" : "시·군·구";
+  $("unitLabel").textContent = COUNTRY === "jp" ? "지역" : "시·군·구";
   $("provList").innerHTML = provCodes.map(pc =>
     `<div class="prov-row" id="prov-${pc}"><span class="name">${PROV[pc] || ""}</span>` +
     `<div class="bar"><div></div></div><span class="num"></span></div>`).join("");
@@ -1292,7 +1295,7 @@ function render() {
   $("totalBar").style.width = pct + "%";
   $("mapStatPill").innerHTML = `<b>${n}</b> / ${paths.length} · ${pctText}`;
   const pv = {};
-  visited.forEach(c => { const pc = c.slice(0, 2); pv[pc] = (pv[pc] || 0) + 1; });
+  visited.forEach(c => { const pc = groupOf(c); pv[pc] = (pv[pc] || 0) + 1; });
   provCodes.forEach(pc => {
     const row = $("prov-" + pc);
     if (!row) return;
@@ -1358,7 +1361,7 @@ function focusRegion(code) {
 const searchIndex = Object.values(MAPS).flatMap(m => m.paths.map(p => ({
   code: p.dataset.code,
   name: p.dataset.name,
-  prov: PROV[p.dataset.code.slice(0, 2)] || "",
+  prov: PROV[groupOf(p.dataset.code)] || "",
   cc: m.cc
 })));
 const searchInput = $("searchInput");

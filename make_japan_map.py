@@ -38,6 +38,28 @@ REGIONS = {
 }
 REGION_OF = {p: r for r, (_, ps) in REGIONS.items() for p in ps}
 
+# 도쿄도는 시·구 단위로 분할 (섬 지역 제외: JIS 13308 이하만)
+TOKYO_KO = {
+    "13101": "지요다구", "13102": "주오구", "13103": "미나토구", "13104": "신주쿠구",
+    "13105": "분쿄구", "13106": "다이토구", "13107": "스미다구", "13108": "고토구",
+    "13109": "시나가와구", "13110": "메구로구", "13111": "오타구", "13112": "세타가야구",
+    "13113": "시부야구", "13114": "나카노구", "13115": "스기나미구", "13116": "도시마구",
+    "13117": "기타구", "13118": "아라카와구", "13119": "이타바시구", "13120": "네리마구",
+    "13121": "아다치구", "13122": "가쓰시카구", "13123": "에도가와구",
+    "13201": "하치오지시", "13202": "다치카와시", "13203": "무사시노시", "13204": "미타카시",
+    "13205": "오메시", "13206": "후추시", "13207": "아키시마시", "13208": "조후시",
+    "13209": "마치다시", "13210": "고가네이시", "13211": "고다이라시", "13212": "히노시",
+    "13213": "히가시무라야마시", "13214": "고쿠분지시", "13215": "구니타치시",
+    "13218": "훗사시", "13219": "고마에시", "13220": "히가시야마토시", "13221": "기요세시",
+    "13222": "히가시쿠루메시", "13223": "무사시무라야마시", "13224": "다마시",
+    "13225": "이나기시", "13227": "하무라시", "13228": "아키루노시", "13229": "니시토쿄시",
+    "13303": "미즈호마치", "13305": "히노데마치", "13307": "히노하라무라", "13308": "오쿠타마마치",
+}
+TOKYO_PID = 13
+TOKYO_GROUP = "9T"          # 통계 그룹 키 (도쿄)
+TOKYO_TOL = 0.0004          # 구는 작아서 단순화 강도를 낮춤
+TOKYO_MIN_AREA = 0.000002
+
 
 def dp_simplify(pts, tol):
     if len(pts) < 3:
@@ -93,6 +115,8 @@ with open("japan.geojson", encoding="utf-8") as f:
 prefs = {}   # id -> [rings]
 for feat in gj["features"]:
     pid = feat["properties"]["id"]
+    if pid == TOKYO_PID:
+        continue          # 도쿄는 아래에서 시·구 단위로 따로 처리
     geom = feat["geometry"]
     if not geom:
         continue
@@ -109,10 +133,34 @@ for feat in gj["features"]:
     if rings:
         prefs.setdefault(pid, []).extend(rings)
 
+# --- 도쿄 시·구 ---
+tokyo = {}   # JIS코드 -> [rings]
+with open("tokyo_raw.json", encoding="utf-8") as f:
+    tgj = json.load(f)
+for feat in tgj["features"]:
+    jis = str(feat["properties"].get("N03_007") or "")
+    if jis not in TOKYO_KO:
+        continue
+    geom = feat["geometry"]
+    if not geom:
+        continue
+    polys = geom["coordinates"] if geom["type"] == "MultiPolygon" else [geom["coordinates"]]
+    rings_raw = [r for poly in polys for r in poly]
+    rings_raw.sort(key=ring_area, reverse=True)
+    rings = []
+    for i, r in enumerate(rings_raw):
+        if i > 0 and ring_area(r) < TOKYO_MIN_AREA:
+            continue
+        s = dp_simplify(r, TOKYO_TOL)
+        if len(s) >= 4:
+            rings.append(s)
+    if rings:
+        tokyo.setdefault(jis, []).extend(rings)
+
 # 화면 범위: 각 현의 '가장 큰 링'만으로 산출 (멀리 떨어진 외딴 섬 제외)
 minx = miny = 1e9
 maxx = maxy = -1e9
-for pid, rings in prefs.items():
+for rings in list(prefs.values()) + list(tokyo.values()):
     main = max(rings, key=ring_area)
     for x, y in main:
         minx, maxx = min(minx, x), max(maxx, x)
@@ -144,12 +192,36 @@ def tr(x, y):
     return round(ox + (x - minx) * kx * scale, 1), round(oy + (maxy - y) * scale, 1)
 
 
-paths, labels, meta = [], [], {}
+paths, labels, meta, groups_of = [], [], {}, {}
+
+
+def emit(code, name, rings, group):
+    """SVG path + 라벨 + 메타 추가"""
+    d_parts = []
+    for r in rings:
+        pts = [tr(x, y) for x, y in r]
+        d_parts.append("M" + " L".join(f"{x} {y}" for x, y in pts) + " Z")
+    paths.append(f'  <path id="m{code}" data-name="{name}" data-code="{code}" d="{" ".join(d_parts)}"/>')
+    main = max(rings, key=ring_area)
+    cx, cy = tr(*ring_centroid(main))
+    pts = [tr(x, y) for x, y in main]
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    labels.append(f'  <text x="{cx}" y="{cy}" dy=".35em" data-w="{round(max(xs) - min(xs), 1)}" '
+                  f'data-h="{round(max(ys) - min(ys), 1)}" data-code="{code}">{name}</text>')
+    meta[code] = name
+    groups_of[code] = group
+
+
+for jis in sorted(tokyo):
+    emit("9" + jis, TOKYO_KO[jis], tokyo[jis], TOKYO_GROUP)
+
 for pid in sorted(prefs):
     rings = prefs[pid]
     region = REGION_OF[pid]
     code = str(90000 + region * 1000 + pid)
     name = PREF_KO[pid]
+    groups_of[code] = str(90 + region)
     d_parts = []
     for r in rings:
         pts = [tr(x, y) for x, y in r]
@@ -179,7 +251,9 @@ with open("japan_map.svg", "w", encoding="utf-8") as f:
     f.write(svg)
 
 regions_out = {str(90 + r): nm for r, (nm, _) in REGIONS.items()}
+regions_out[TOKYO_GROUP] = "도쿄"
 with open("japan_meta.json", "w", encoding="utf-8") as f:
-    json.dump({"names": meta, "regions": regions_out}, f, ensure_ascii=False, indent=1)
+    json.dump({"names": meta, "regions": regions_out, "groups": groups_of},
+              f, ensure_ascii=False, indent=1)
 
-print(f"도도부현 {len(paths)}개, 지방 {len(regions_out)}개")
+print(f"일본 지역 {len(paths)}개 (도쿄 시·구 {len(tokyo)}개 포함), 그룹 {len(regions_out)}개")
