@@ -59,6 +59,7 @@ TOKYO_PID = 13
 TOKYO_GROUP = "9T"          # 통계 그룹 키 (도쿄)
 TOKYO_TOL = 0.0004          # 구는 작아서 단순화 강도를 낮춤
 TOKYO_MIN_AREA = 0.000002
+SPLIT_TOKYO = False         # True면 도쿄를 시·구로 분할, False면 도(都) 하나로
 
 
 def dp_simplify(pts, tol):
@@ -115,8 +116,8 @@ with open("japan.geojson", encoding="utf-8") as f:
 prefs = {}   # id -> [rings]
 for feat in gj["features"]:
     pid = feat["properties"]["id"]
-    if pid == TOKYO_PID:
-        continue          # 도쿄는 아래에서 시·구 단위로 따로 처리
+    if SPLIT_TOKYO and pid == TOKYO_PID:
+        continue          # 분할 모드일 때만 도쿄를 시·구 단위로 따로 처리
     geom = feat["geometry"]
     if not geom:
         continue
@@ -133,10 +134,13 @@ for feat in gj["features"]:
     if rings:
         prefs.setdefault(pid, []).extend(rings)
 
-# --- 도쿄 시·구 ---
+# --- 도쿄 시·구 (SPLIT_TOKYO 일 때만) ---
 tokyo = {}   # JIS코드 -> [rings]
-with open("tokyo_raw.json", encoding="utf-8") as f:
-    tgj = json.load(f)
+if SPLIT_TOKYO:
+    with open("tokyo_raw.json", encoding="utf-8") as f:
+        tgj = json.load(f)
+else:
+    tgj = {"features": []}
 for feat in tgj["features"]:
     jis = str(feat["properties"].get("N03_007") or "")
     if jis not in TOKYO_KO:

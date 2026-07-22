@@ -1280,7 +1280,7 @@ function buildProvList() {
   provCodes = Object.keys(provTotals).sort();
   $("total").textContent = paths.length;
   $("statsHead").textContent = COUNTRY === "jp" ? "지방별 달성률" : "시·도별 달성률";
-  $("unitLabel").textContent = COUNTRY === "jp" ? "지역" : "시·군·구";
+  $("unitLabel").textContent = COUNTRY === "jp" ? "도도부현" : "시·군·구";
   $("provList").innerHTML = provCodes.map(pc =>
     `<div class="prov-row" id="prov-${pc}"><span class="name">${PROV[pc] || ""}</span>` +
     `<div class="bar"><div></div></div><span class="num"></span></div>`).join("");
