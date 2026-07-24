@@ -220,7 +220,14 @@ class Handler(SimpleHTTPRequestHandler):
                     self.send_json({"error": "bad visits"}, 400)
                     return
                 def _date(s):
-                    return s if isinstance(s, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", s) else ""
+                    if not (isinstance(s, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", s)):
+                        return ""
+                    try:
+                        import datetime
+                        datetime.date(*map(int, s.split("-")))
+                        return s
+                    except ValueError:
+                        return ""
                 clean = []
                 for v in visits[:50]:
                     if not isinstance(v, dict):

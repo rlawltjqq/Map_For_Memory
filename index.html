@@ -1273,7 +1273,7 @@ function showLanding() {
   const ids = Object.keys(savedRooms);
   $("myRoomsWrap").style.display = ids.length ? "" : "none";
   $("myRooms").innerHTML = ids.map(id =>
-    `<a href="/?room=${id}">${ICON_PIN} ${savedRooms[id].name}</a>`).join("");
+    `<a href="/?room=${encodeURIComponent(id)}">${ICON_PIN} ${escapeHtml(savedRooms[id].name || "")}</a>`).join("");
 }
 async function enterRoom(id) {
   ROOM = id;
@@ -1436,13 +1436,13 @@ async function buildMapImage() {
   const ctx = canvas.getContext("2d");
   ctx.scale(DPR, DPR);
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H + HEADER);
-  // 헤더 텍스트 (현재 보고 있는 나라 기준)
+  // 헤더 텍스트 (현재 보고 있는 나라 기준, 지도에 존재하는 코드만)
   let n = 0;
-  visited.forEach(c => { if (countryOfCode(c) === COUNTRY) n++; });
+  visited.forEach(c => { if (countryOfCode(c) === COUNTRY && nameByCode[c]) n++; });
   const unit = COUNTRY === "jp" ? "도도부현" : "시·군·구";
   const pct = Math.round(n / paths.length * 1000) / 10;
   ctx.fillStyle = "#1f2937";
-  ctx.font = "700 34px 'Pretendard Variable',Pretendard,'Pretendard Variable',Pretendard,'Malgun Gothic',sans-serif";
+  ctx.font = "700 34px 'Pretendard Variable',Pretendard,'Malgun Gothic',sans-serif";
   ctx.textBaseline = "alphabetic";
   ctx.fillText($("roomName").textContent || "나의 여행 지도", 40, 58);
   ctx.fillStyle = "#3b9c6e";
@@ -1921,8 +1921,8 @@ $("photoInput").addEventListener("change", async e => {
 });
 $("lightbox").onclick = () => { $("lightbox").style.display = "none"; };
 
-// ---- 툴팁 ----
-paths.forEach(p => {
+// ---- 툴팁 (두 나라 지도 모두) ----
+Object.values(MAPS).forEach(m => m.paths.forEach(p => {
   p.addEventListener("pointermove", e => {
     const code = p.dataset.code;
     const prov = PROV[groupOf(code)] || "";
@@ -1934,7 +1934,7 @@ paths.forEach(p => {
     tooltip.style.top = (e.clientY + 14) + "px";
   });
   p.addEventListener("pointerleave", () => { tooltip.style.display = "none"; });
-});
+}));
 
 // ---- 통계 (현재 보고 있는 나라 기준) ----
 let provCodes = [], provTotals = {};
@@ -1955,7 +1955,7 @@ function buildProvList() {
 function render() {
   // 방문 수는 현재 나라 기준으로만 집계
   let n = 0;
-  visited.forEach(c => { if (countryOfCode(c) === COUNTRY) n++; });
+  visited.forEach(c => { if (countryOfCode(c) === COUNTRY && nameByCode[c]) n++; });
   $("cnt").textContent = n;
   const pct = paths.length ? n / paths.length * 100 : 0;
   const pctText = (pct > 0 && pct < 10 ? pct.toFixed(1) : Math.round(pct)) + "%";
@@ -1963,7 +1963,7 @@ function render() {
   $("totalBar").style.width = pct + "%";
   $("mapStatPill").innerHTML = `<b>${n}</b> / ${paths.length} · ${pctText}`;
   const pv = {};
-  visited.forEach(c => { const pc = groupOf(c); pv[pc] = (pv[pc] || 0) + 1; });
+  visited.forEach(c => { if (!nameByCode[c]) return; const pc = groupOf(c); pv[pc] = (pv[pc] || 0) + 1; });
   provCodes.forEach(pc => {
     const row = $("prov-" + pc);
     if (!row) return;
@@ -2263,7 +2263,7 @@ MAPSVGS.forEach(el => el.addEventListener("pointermove", e => {
 $("resetBtn").onclick = () => {
   const cName = COUNTRY === "jp" ? "일본" : "한국";
   let n = 0;
-  visited.forEach(c => { if (countryOfCode(c) === COUNTRY) n++; });
+  visited.forEach(c => { if (countryOfCode(c) === COUNTRY && nameByCode[c]) n++; });
   $("resetDesc").innerHTML =
     `<b>${cName}</b>의 방문 표시 <b>${n}곳</b>이 지워집니다.<br>` +
     `사진·메모는 그대로 남고, 다른 나라 기록은 유지됩니다.<br>함께 쓰는 지도라면 모두에게 적용됩니다.`;
