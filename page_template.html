@@ -665,21 +665,72 @@ function startApp(state) {
   $("roomName").textContent = state.name;
   rememberRoom(ROOM, state.name, TOKEN);
   applyState(state);
+  migrateTokyoWards();   // 예전 도쿄 시·구 기록을 도쿄도로 이관 (있을 때만)
   setBadge(true);
   updateLabels();
   maybeShowFirstHint();
   clearInterval(pollTimer);
   pollTimer = setInterval(refresh, 12000);   // 다른 사람의 변경 반영
 }
+// 도쿄를 도(都) 하나로 합치기 전에 남은 시·구 코드(913xxx) 기록을 도쿄도(93013)로 이관.
+// 비파괴: 방문·메모를 도쿄도로 합치고 유령 코드만 제거. (사진은 그대로 두어 유실 없음)
+function migrateTokyoWards() {
+  const wardRe = /^913\d{3}$/, T = "93013";
+  const wardVisits = [...visited].filter(c => wardRe.test(c));
+  const wardNotes = Object.keys(notes).filter(c => wardRe.test(c));
+  if (!wardVisits.length && !wardNotes.length) return;
+  markDirty(T);
+  // 방문 이관
+  if (wardVisits.length) {
+    if (!visited.has(T)) {
+      visited.add(T);
+      api("/api/visited", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ room: ROOM, code: T, on: true }) }).catch(() => {});
+    }
+    wardVisits.forEach(c => {
+      visited.delete(c); markDirty(c);
+      api("/api/visited", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ room: ROOM, code: c, on: false }) }).catch(() => {});
+    });
+  }
+  // 메모(방문 기록) 이관
+  if (wardNotes.length) {
+    const merged = getVisits(T);
+    wardNotes.forEach(c => {
+      getVisits(c).forEach(v => merged.push({ id: v.id || newVid(), start: v.start, end: v.end, memo: v.memo }));
+      delete notes[c]; markDirty(c);
+      api("/api/note", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ room: ROOM, code: c, visits: [] }) }).catch(() => {});
+    });
+    notes[T] = { visits: merged };
+    api("/api/note", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ room: ROOM, code: T, visits: merged }) }).catch(() => {});
+  }
+  paintVisited(); render(); renderFeed();
+}
 function paintVisited() {
   // 두 나라 지도 모두 방문 색칠을 갱신 (나라를 바꿔도 색이 유지되도록)
   Object.values(MAPS).forEach(m =>
     m.paths.forEach(p => p.classList.toggle("visited", visited.has(p.dataset.code))));
 }
+// 최근에 로컬 편집한 지역 (code -> 만료 시각). 폴링이 이 지역을 덮어쓰지 않게 함.
+const dirty = new Map();
+function markDirty(code) { dirty.set(String(code), Date.now() + 6000); }
 function applyState(s) {
-  visited = new Set((s.visited || []).map(String));
-  photos = s.photos || {};
-  notes = s.notes || {};
+  const now = Date.now();
+  const inVisited = new Set((s.visited || []).map(String));
+  const inPhotos = s.photos || {};
+  const inNotes = s.notes || {};
+  // 최근 로컬 편집(dirty) 지역은 서버 상태 대신 로컬 값을 유지 (동시 편집/폴링 클로버 방지)
+  dirty.forEach((exp, code) => {
+    if (exp < now) { dirty.delete(code); return; }
+    if (visited.has(code)) inVisited.add(code); else inVisited.delete(code);
+    if (notes[code]) inNotes[code] = notes[code]; else delete inNotes[code];
+    if (photos[code]) inPhotos[code] = photos[code]; else delete inPhotos[code];
+  });
+  visited = inVisited;
+  photos = inPhotos;
+  notes = inNotes;
   paintVisited();
   render();
   renderFeed();
@@ -866,6 +917,7 @@ function handleTap(clientX, clientY) {
   if (code) select(code);
 }
 function toggleVisited(code) {
+  markDirty(code);
   const p = paths.find(x => x.dataset.code === code);
   const on = !visited.has(code);
   if (on) { visited.add(code); p.classList.add("visited"); }
@@ -969,6 +1021,7 @@ function openMovePicker(code, url) {
 $("moveCancel").onclick = () => $("movePicker").classList.remove("show");
 $("movePicker").onclick = (e) => { if (e.target.id === "movePicker") $("movePicker").classList.remove("show"); };
 async function movePhoto(code, url, vid) {
+  markDirty(code);
   $("movePicker").classList.remove("show");
   try {
     await api(`/api/photo?room=${ROOM}&code=${code}&vid=${encodeURIComponent(vid)}`, {
@@ -1038,6 +1091,7 @@ function wirePhotoGrid(root, code) {
       ev.stopPropagation();
       if (!confirm("이 사진을 삭제할까요?")) return;
       const url = btn.dataset.url;
+      markDirty(code);
       try {
         await api(`/api/photo?room=${ROOM}&code=${code}`, {
           method: "DELETE", headers: { "Content-Type": "application/json" },
@@ -1116,6 +1170,7 @@ function renderVisits() {
   });
 }
 function saveVisits(code, visits) {
+  markDirty(code);
   // 사용자가 명시적으로 추가한 방문은 비어 있어도 유지 (사진·날짜를 나중에 채울 수 있게)
   const clean = visits.filter(v => v.id);
   if (clean.length) notes[code] = { visits: clean };
@@ -1251,6 +1306,7 @@ async function compressImage(file) {
 $("photoInput").addEventListener("change", async e => {
   if (!selected) { e.target.value = ""; return; }
   const code = selected, vid = pendingVid;
+  markDirty(code);
   const files = [...e.target.files];
   e.target.value = "";
   for (let i = 0; i < files.length; i++) {
