@@ -488,7 +488,7 @@
       <h2 id="statsHead">시·도별 달성률</h2>
       <div id="provList"></div>
       <div class="btns">
-        <button id="resetBtn">전체 초기화</button>
+        <button id="resetBtn">방문 표시 초기화</button>
       </div>
     </aside>
   </div>
@@ -519,7 +519,7 @@
 </div>
 <div id="resetModal">
   <div class="card">
-    <h3>전체 초기화</h3>
+    <h3>방문 표시 초기화</h3>
     <p id="resetDesc"></p>
     <input type="password" id="resetPw" placeholder="지도 비밀번호" autocomplete="current-password">
     <div class="err" id="resetErr"></div>
@@ -547,6 +547,7 @@ const MAPS = {};
   const ps = [...el.querySelectorAll(".g-munis path")];
   const marks = document.createElementNS("http://www.w3.org/2000/svg", "g");
   marks.setAttribute("pointer-events", "none");
+  marks.setAttribute("class", "g-marks");
   el.insertBefore(marks, el.querySelector(".g-labels"));
   const byCode = {};
   ps.forEach(p => { byCode[p.dataset.code] = p; });
@@ -670,11 +671,16 @@ function startApp(state) {
   clearInterval(pollTimer);
   pollTimer = setInterval(refresh, 12000);   // 다른 사람의 변경 반영
 }
+function paintVisited() {
+  // 두 나라 지도 모두 방문 색칠을 갱신 (나라를 바꿔도 색이 유지되도록)
+  Object.values(MAPS).forEach(m =>
+    m.paths.forEach(p => p.classList.toggle("visited", visited.has(p.dataset.code))));
+}
 function applyState(s) {
   visited = new Set((s.visited || []).map(String));
   photos = s.photos || {};
   notes = s.notes || {};
-  paths.forEach(p => p.classList.toggle("visited", visited.has(p.dataset.code)));
+  paintVisited();
   render();
   renderFeed();
   if (selected) renderPanel();
@@ -744,15 +750,19 @@ async function buildMapImage() {
   });
   // 라벨은 전국 뷰에서 겹치므로 제거, 마커만 다시 그림
   const cLabels = clone.querySelector(".g-labels"); if (cLabels) cLabels.remove();
-  const cMarks = clone.querySelector("#visitMarks"); if (cMarks) cMarks.remove();
-  // 방문 심벌을 지역 중심에 data URI로 배치
+  const cMarks = clone.querySelector(".g-marks"); if (cMarks) cMarks.remove();
+  // 방문 심벌을 지역 라벨 중심(가장 큰 섬의 무게중심)에 data URI로 배치
+  // — bbox 중심을 쓰면 먼 섬(이즈 제도 등)이 포함된 지역은 마커가 바다로 밀림
+  const labelPos = {};
+  muniTexts.forEach(t => { labelPos[t.dataset.code] = [+t.getAttribute("x"), +t.getAttribute("y")]; });
   const markG = document.createElementNS("http://www.w3.org/2000/svg", "g");
   for (const p of paths) {
     if (!visited.has(p.dataset.code)) continue;
     const bb = p.getBBox();
     const em = EMBLEMS[p.dataset.code];
     const size = Math.min(Math.min(bb.width, bb.height) * 0.9, 26);
-    const cx = bb.x + bb.width / 2, cy = bb.y + bb.height / 2;
+    const pos = labelPos[p.dataset.code] || [bb.x + bb.width / 2, bb.y + bb.height / 2];
+    const cx = pos[0], cy = pos[1];
     if (em) {
       const data = await toDataURL(em);
       const img = document.createElementNS("http://www.w3.org/2000/svg", "image");
@@ -778,8 +788,11 @@ async function buildMapImage() {
   const ctx = canvas.getContext("2d");
   ctx.scale(DPR, DPR);
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H + HEADER);
-  // 헤더 텍스트
-  const n = visited.size, pct = Math.round(n / paths.length * 1000) / 10;
+  // 헤더 텍스트 (현재 보고 있는 나라 기준)
+  let n = 0;
+  visited.forEach(c => { if (countryOfCode(c) === COUNTRY) n++; });
+  const unit = COUNTRY === "jp" ? "도도부현" : "시·군·구";
+  const pct = Math.round(n / paths.length * 1000) / 10;
   ctx.fillStyle = "#1f2937";
   ctx.font = "700 34px 'Pretendard Variable',Pretendard,'Pretendard Variable',Pretendard,'Malgun Gothic',sans-serif";
   ctx.textBaseline = "alphabetic";
@@ -791,7 +804,7 @@ async function buildMapImage() {
   const pctW = ctx.measureText(pctStr).width;
   ctx.fillStyle = "#6b7280";
   ctx.font = "400 18px 'Pretendard Variable',Pretendard,'Malgun Gothic',sans-serif";
-  ctx.fillText(`${n} / ${paths.length} 시·군·구 방문`, 40 + pctW + 12, 100);
+  ctx.fillText(`${n} / ${paths.length} ${unit} 방문`, 40 + pctW + 12, 100);
   ctx.textAlign = "right";
   ctx.fillStyle = "#9ca3af";
   ctx.font = "400 15px 'Pretendard Variable',Pretendard,'Malgun Gothic',sans-serif";
@@ -1598,11 +1611,14 @@ MAPSVGS.forEach(el => el.addEventListener("pointermove", e => {
 })));
 
 // ---- 내보내기 / 가져오기 / 초기화 ----
-// 전체 초기화 — 지도 비밀번호 확인 후 실행 (서버에서 검증)
+// 초기화 — 지금 보고 있는 나라의 방문 표시만, 지도 비밀번호 확인 후 실행
 $("resetBtn").onclick = () => {
+  const cName = COUNTRY === "jp" ? "일본" : "한국";
+  let n = 0;
+  visited.forEach(c => { if (countryOfCode(c) === COUNTRY) n++; });
   $("resetDesc").innerHTML =
-    `방문 표시 <b>${visited.size}곳</b>이 모두 지워집니다.<br>` +
-    `사진·메모는 그대로 남습니다.<br>함께 쓰는 지도라면 모두에게 적용됩니다.`;
+    `<b>${cName}</b>의 방문 표시 <b>${n}곳</b>이 지워집니다.<br>` +
+    `사진·메모는 그대로 남고, 다른 나라 기록은 유지됩니다.<br>함께 쓰는 지도라면 모두에게 적용됩니다.`;
   $("resetPw").value = "";
   $("resetErr").textContent = "";
   $("resetModal").classList.add("show");
@@ -1619,11 +1635,12 @@ $("resetConfirm").onclick = async () => {
   try {
     await api("/api/reset", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ room: ROOM, password: pw })
+      body: JSON.stringify({ room: ROOM, password: pw, country: COUNTRY })
     });
-    visited.clear();
-    paths.forEach(p => p.classList.remove("visited"));
-    render(); updateLabels();
+    // 현재 나라 방문만 제거
+    [...visited].forEach(c => { if (countryOfCode(c) === COUNTRY) visited.delete(c); });
+    paintVisited();
+    render(); updateLabels(); renderFeed();
     if (selected) renderPanel();
     setBadge(true);
     $("resetModal").classList.remove("show");

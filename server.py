@@ -191,7 +191,13 @@ class Handler(SimpleHTTPRequestHandler):
                 if hash_pw(body.get("password") or "", meta["salt"]) != meta["pwhash"]:
                     self.send_json({"error": "비밀번호가 틀렸습니다"}, 403)
                     return
-                meta["visited"] = []
+                country = body.get("country")
+                cur = meta.get("visited", [])
+                if country in ("kr", "jp"):
+                    meta["visited"] = [c for c in cur
+                                       if (country == "jp") != str(c).startswith("9")]
+                else:
+                    meta["visited"] = []
                 save_rooms(rooms)
             self.send_json({"ok": True})
             return
