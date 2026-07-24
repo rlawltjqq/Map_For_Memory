@@ -96,16 +96,17 @@
   .mapsvg.dragging { cursor: grabbing; }
   .mapsvg.hidden { display: none; }
   /* 나라 전환 */
-  #countrySwitch {
-    position: absolute; top: 10px; right: 14px; z-index: 6; display: flex; gap: 4px;
-    background: rgba(255,255,255,.93); border: 1px solid #e5e7eb; border-radius: 999px;
-    padding: 3px; box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  .cswitch {
+    display: flex; gap: 4px; background: rgba(255,255,255,.93);
+    border: 1px solid #e5e7eb; border-radius: 999px; padding: 3px;
   }
-  #countrySwitch button {
+  .cswitch button {
     border: none; background: none; padding: 5px 12px; border-radius: 999px;
     font-size: 12.5px; color: #6b7280; cursor: pointer;
   }
-  #countrySwitch button.active { background: #3b9c6e; color: #fff; font-weight: 600; }
+  .cswitch button.active { background: #3b9c6e; color: #fff; font-weight: 600; }
+  #countrySwitch { position: absolute; top: 10px; right: 14px; z-index: 6; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .aside-cswitch { width: max-content; margin: 12px auto 2px; }
   /* 경계선을 줌과 무관하게 항상 얇게 (non-scaling-stroke) */
   .g-munis path {
     transition: fill .15s; cursor: pointer;
@@ -437,7 +438,7 @@
   </header>
   <div class="layout">
     <div class="map-wrap" id="mapWrap">
-      <div id="countrySwitch">
+      <div id="countrySwitch" class="cswitch">
         <button data-country="kr" class="active">🇰🇷 한국</button>
         <button data-country="jp">🇯🇵 일본</button>
       </div>
@@ -457,6 +458,10 @@
         <div class="cnt"><span id="cnt">0</span> / <span id="total">0</span> <span id="unitLabel">시·군·구</span></div>
       </div>
       <div class="total-bar"><div id="totalBar"></div></div>
+      <div class="cswitch aside-cswitch">
+        <button data-country="kr" class="active">🇰🇷 한국</button>
+        <button data-country="jp">🇯🇵 일본</button>
+      </div>
 
       <div id="regionPanel">
         <div class="hint" id="rpHint">지도에서 지역을 클릭하면<br>사진을 추가할 수 있어요</div>
@@ -1141,6 +1146,7 @@ function renderFeed() {
   const codes = new Set([...Object.keys(notes), ...Object.keys(photos)]);
   codes.forEach(code => {
     if (!nameByCode[code]) return;   // 지도에 없는 코드는 건너뜀
+    if (countryOfCode(code) !== COUNTRY) return;   // 현재 나라의 기록만
     const visits = getVisits(code).filter(v => v.start || v.end || v.memo);
     const ph = photos[code] || [];
     if (!visits.length && ph.length === 0) return;
@@ -1318,7 +1324,7 @@ function setCountry(cc) {
   if (!MAPS[cc] || cc === COUNTRY) return;
   bindMap(cc);
   Object.values(MAPS).forEach(m => m.svg.classList.toggle("hidden", m.cc !== cc));
-  document.querySelectorAll("#countrySwitch button").forEach(b =>
+  document.querySelectorAll(".cswitch button").forEach(b =>
     b.classList.toggle("active", b.dataset.country === cc));
   // 선택 해제 후 활성 지도 기준으로 다시 그림
   selected = null;
@@ -1326,9 +1332,9 @@ function setCountry(cc) {
   $("rpBody").style.display = "none";
   if (mq.matches) regionPanelEl.classList.remove("open");
   buildProvList();
-  render(); applyVB();
+  render(); renderFeed(); applyVB();
 }
-document.querySelectorAll("#countrySwitch button").forEach(b => {
+document.querySelectorAll(".cswitch button").forEach(b => {
   b.onclick = () => setCountry(b.dataset.country);
 });
 function regionBBox(code) {
