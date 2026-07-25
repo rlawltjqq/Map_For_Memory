@@ -346,7 +346,19 @@
     position: fixed; inset: 0; background: rgba(0,0,0,.85); display: none;
     align-items: center; justify-content: center; z-index: 20; cursor: zoom-out;
   }
-  #lightbox img { max-width: 92vw; max-height: 92vh; border-radius: 6px; touch-action: pan-y; }
+  #lightbox img {
+    max-width: 92vw; max-height: 92vh; border-radius: 6px;
+    touch-action: none; user-select: none; -webkit-user-drag: none;
+    transform-origin: center center; will-change: transform;
+  }
+  #lightbox.zoomed { cursor: grab; }
+  #lightbox.zoomed img { border-radius: 0; }
+  #lbZoomHint {
+    position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+    color: #fff; font-size: 12px; background: rgba(0,0,0,.45);
+    padding: 4px 12px; border-radius: 999px; display: none;
+  }
+  #lightbox.zoomed #lbZoomHint { display: block; }
   .lb-nav {
     position: absolute; top: 50%; transform: translateY(-50%);
     width: 44px; height: 64px; border: none; border-radius: 10px;
@@ -363,6 +375,9 @@
     padding: 4px 12px; border-radius: 999px; display: none;
   }
   #lightbox.multi #lbCount { display: block; }
+  /* 확대 중에는 넘기기 버튼·장수 숨김 (화면 이동에 집중) — .multi 규칙보다 뒤에 와야 적용됨 */
+  #lightbox.zoomed .lb-nav, #lightbox.zoomed #lbCount,
+  #lightbox.multi.zoomed .lb-nav, #lightbox.multi.zoomed #lbCount { display: none; }
   @media (max-width: 720px) {
     /* 모바일은 스와이프 위주 — 화살표는 작게 */
     .lb-nav { width: 36px; height: 52px; font-size: 24px; background: rgba(255,255,255,.10); }
@@ -1204,6 +1219,7 @@
   <button id="lbPrev" class="lb-nav" aria-label="이전 사진">‹</button>
   <button id="lbNext" class="lb-nav" aria-label="다음 사진">›</button>
   <div id="lbCount"></div>
+  <div id="lbZoomHint">두 번 탭하면 원래대로</div>
 </div>
 <div id="movePicker">
   <div class="card">
@@ -2126,13 +2142,15 @@ $("photoInput").addEventListener("change", async e => {
   else if ((photos[code] || []).length && !visited.has(code)) toggleVisited(code);
   renderPanel(); renderFeed();
 });
-// ---- 사진 크게 보기 (스와이프·화살표·키보드로 넘기기) ----
+// ---- 사진 크게 보기 (넘기기 + 확대/축소) ----
 let lbList = [], lbIdx = 0;
+let lbResetZoom = () => {};   // 확대 상태 초기화 (아래 확대 모듈에서 채움)
 function openLightbox(urls, startUrl) {
   lbList = (urls && urls.length) ? urls : [startUrl];
   lbIdx = Math.max(0, lbList.indexOf(startUrl));
   const box = $("lightbox");
   box.classList.toggle("multi", lbList.length > 1);
+  lbResetZoom();
   showLbPhoto();
   box.style.display = "flex";
 }
@@ -2144,32 +2162,145 @@ function showLbPhoto() {
 function lbMove(step) {
   if (lbList.length < 2) return;
   lbIdx = (lbIdx + step + lbList.length) % lbList.length;
+  lbResetZoom();   // 사진을 넘기면 확대 해제
   showLbPhoto();
 }
-function closeLightbox() { $("lightbox").style.display = "none"; }
-$("lightbox").onclick = (e) => { if (e.target.id === "lightbox") closeLightbox(); };
-$("lightbox").querySelector("img").onclick = (e) => e.stopPropagation();
+function closeLightbox() { lbResetZoom(); $("lightbox").style.display = "none"; }
 $("lbPrev").onclick = (e) => { e.stopPropagation(); lbMove(-1); };
 $("lbNext").onclick = (e) => { e.stopPropagation(); lbMove(1); };
 document.addEventListener("keydown", (e) => {
   if ($("lightbox").style.display !== "flex") return;
-  if (e.key === "Escape") closeLightbox();
-  else if (e.key === "ArrowLeft") lbMove(-1);
-  else if (e.key === "ArrowRight") lbMove(1);
+  const zoomed = $("lightbox").classList.contains("zoomed");
+  if (e.key === "Escape") { if (zoomed) lbResetZoom(); else closeLightbox(); }
+  else if (e.key === "ArrowLeft") { if (!zoomed) lbMove(-1); }
+  else if (e.key === "ArrowRight") { if (!zoomed) lbMove(1); }
 });
-// 스와이프 (모바일)
+// ---- 확대/축소 + 스와이프 ----
+// 확대 안 했을 때: 좌우 스와이프=사진 넘기기, 위아래로 크게 밀면 닫기
+// 확대했을 때: 드래그=화면 이동, 넘기기 비활성 (핀치·더블탭·휠로 배율 조절)
 (() => {
-  let sx = 0, sy = 0, active = false;
   const box = $("lightbox");
-  box.addEventListener("pointerdown", (e) => { sx = e.clientX; sy = e.clientY; active = true; });
-  box.addEventListener("pointerup", (e) => {
-    if (!active) return;
-    active = false;
-    const dx = e.clientX - sx, dy = e.clientY - sy;
-    if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) lbMove(dx < 0 ? 1 : -1);
-    else if (Math.abs(dy) > 90 && Math.abs(dy) > Math.abs(dx)) closeLightbox();  // 위/아래로 밀면 닫기
+  const img = box.querySelector("img");
+  const MAXZ = 5;
+  let scale = 1, tx = 0, ty = 0;
+  const pts = new Map();
+  let startDist = 0, startScale = 1, startMid = null, startTx = 0, startTy = 0;
+  let dragStart = null, moved = false, lastTap = null;
+
+  function apply() {
+    img.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+    box.classList.toggle("zoomed", scale > 1.01);
+  }
+  function clampPan() {
+    // 확대된 이미지가 화면 밖으로 너무 빠져나가지 않게
+    const r = img.getBoundingClientRect();
+    const w = r.width / scale, h = r.height / scale;
+    const maxX = Math.max(0, (w * scale - innerWidth) / 2 + 20);
+    const maxY = Math.max(0, (h * scale - innerHeight) / 2 + 20);
+    tx = Math.min(maxX, Math.max(-maxX, tx));
+    ty = Math.min(maxY, Math.max(-maxY, ty));
+  }
+  function resetZoom() { scale = 1; tx = ty = 0; apply(); }
+  lbResetZoom = resetZoom;    // 사진을 넘기거나 닫을 때 초기화
+
+  function zoomAtPoint(nextScale, cx, cy) {
+    const prev = scale;
+    scale = Math.min(MAXZ, Math.max(1, nextScale));
+    // 손가락(또는 커서) 위치를 기준으로 확대되도록 이동값 보정
+    const k = scale / prev;
+    tx = cx - (cx - tx) * k;
+    ty = cy - (cy - ty) * k;
+    if (scale === 1) { tx = ty = 0; } else clampPan();
+    apply();
+  }
+
+  box.addEventListener("pointerdown", (e) => {
+    if (e.target.closest(".lb-nav")) return;
+    pts.set(e.pointerId, e);
+    if (pts.size === 2) {
+      const [a, b] = [...pts.values()];
+      startDist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      startScale = scale;
+      startMid = { x: (a.clientX + b.clientX) / 2 - innerWidth / 2,
+                   y: (a.clientY + b.clientY) / 2 - innerHeight / 2 };
+      startTx = tx; startTy = ty;
+      dragStart = null;
+    } else if (pts.size === 1) {
+      dragStart = { x: e.clientX, y: e.clientY, tx, ty };
+      moved = false;
+    }
+    try { box.setPointerCapture(e.pointerId); } catch {}
   });
-  box.addEventListener("pointercancel", () => { active = false; });
+
+  box.addEventListener("pointermove", (e) => {
+    if (!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, e);
+    if (pts.size === 2 && startDist > 0) {
+      const [a, b] = [...pts.values()];
+      const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      const next = startScale * (d / startDist);
+      const prev = scale;
+      scale = Math.min(MAXZ, Math.max(1, next));
+      const k = scale / startScale;
+      tx = startTx + startMid.x * (1 - k);
+      ty = startTy + startMid.y * (1 - k);
+      if (scale === 1) { tx = ty = 0; } else clampPan();
+      apply();
+      moved = true;
+    } else if (pts.size === 1 && dragStart) {
+      const dx = e.clientX - dragStart.x, dy = e.clientY - dragStart.y;
+      if (Math.abs(dx) > 6 || Math.abs(dy) > 6) moved = true;
+      if (scale > 1.01) {   // 확대 상태에서만 드래그로 이동
+        tx = dragStart.tx + dx; ty = dragStart.ty + dy;
+        clampPan(); apply();
+      }
+    }
+  });
+
+  function endPointer(e) {
+    if (!pts.has(e.pointerId)) return;
+    const wasSingle = pts.size === 1;
+    const start = dragStart;
+    pts.delete(e.pointerId);
+    if (pts.size < 2) startDist = 0;
+    if (!wasSingle || !start) { dragStart = null; return; }
+    dragStart = null;
+    const dx = e.clientX - start.x, dy = e.clientY - start.y;
+
+    if (scale <= 1.01) {
+      // 확대 안 한 상태: 스와이프로 넘기기 / 아래위로 크게 밀면 닫기
+      if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) { lbMove(dx < 0 ? 1 : -1); return; }
+      if (Math.abs(dy) > 90 && Math.abs(dy) > Math.abs(dx)) { closeLightbox(); return; }
+    }
+    // 더블탭(또는 더블클릭): 확대 ↔ 원래대로
+    if (!moved) {
+      const now = Date.now();
+      const near = lastTap && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 40;
+      if (lastTap && now - lastTap.t < 450 && near) {
+        lastTap = null;
+        const cx = e.clientX - innerWidth / 2, cy = e.clientY - innerHeight / 2;
+        if (scale > 1.01) resetZoom(); else zoomAtPoint(2.5, cx, cy);
+      } else {
+        lastTap = { t: now, x: e.clientX, y: e.clientY };
+        // 배경(이미지 밖) 단일 탭은 닫기 — 단, 더블탭일 수 있으니 잠깐 기다렸다 실행
+        if (scale <= 1.01 && e.target.id === "lightbox") {
+          const mine = lastTap;
+          setTimeout(() => {
+            if (lastTap === mine && scale <= 1.01) closeLightbox();   // 두 번째 탭이 없었으면 닫기
+          }, 300);
+        }
+      }
+    }
+  }
+  box.addEventListener("pointerup", endPointer);
+  box.addEventListener("pointercancel", (e) => { pts.delete(e.pointerId); dragStart = null; startDist = 0; });
+
+  // 데스크톱: 휠로 확대/축소
+  box.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const cx = e.clientX - innerWidth / 2, cy = e.clientY - innerHeight / 2;
+    zoomAtPoint(scale * (e.deltaY > 0 ? 1 / 1.2 : 1.2), cx, cy);
+  }, { passive: false });
 })();
 
 // ---- 툴팁 (두 나라 지도 모두) ----
