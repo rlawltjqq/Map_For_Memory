@@ -3,6 +3,8 @@
 import json
 import math
 
+from svgutil import SCALE, bbox_of, path_d, q
+
 W, H = 800, 1100
 PAD = 20
 SIMPLIFY_TOL = 0.002
@@ -145,28 +147,21 @@ enlarge_dokdo(prov)
 
 
 def to_path(props, rings, with_fill_id=True):
-    d_parts = []
-    for ring in rings:
-        pts = [tr(x, y) for x, y in ring]
-        d_parts.append("M" + " L".join(f"{x} {y}" for x, y in pts) + " Z")
-    if not d_parts:
+    d = path_d(rings, tr)
+    if not d:
         return None
     attrs = f'data-name="{props["name"]}" data-code="{props["code"]}"'
     if with_fill_id:
         attrs = f'id="m{props["code"]}" ' + attrs
-    return f'  <path {attrs} d="{" ".join(d_parts)}"/>'
+    return f'  <path {attrs} d="{d}"/>'
 
 
 def label_of(props, rings, text):
     # 가장 큰 링의 무게중심에 라벨, data-w/h = 그 링의 투영 크기 (라벨·마커 크기 판단용)
     main = rings[0]
     cx, cy = tr(*ring_centroid(main))
-    pts = [tr(x, y) for x, y in main]
-    xs = [p[0] for p in pts]
-    ys = [p[1] for p in pts]
-    w = round(max(xs) - min(xs), 1)
-    h = round(max(ys) - min(ys), 1)
-    return (f'  <text x="{cx}" y="{cy}" dy=".35em" data-w="{w}" data-h="{h}" '
+    _, _, w, h = bbox_of(main, tr)
+    return (f'  <text x="{q(cx)}" y="{q(cy)}" dy=".35em" data-w="{w}" data-h="{h}" '
             f'data-code="{props["code"]}">{text}</text>')
 
 
@@ -184,11 +179,11 @@ for props, rings in prov:
     prov_paths.append(to_path(props, rings, with_fill_id=False))
     prov_labels.append(label_of(props, rings, PROV_SHORT.get(props["name"], props["name"])))
 
-svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}">
-<g id="municipalities" fill="#ffffff" stroke="#c6cfd9" stroke-width="0.55" stroke-linejoin="round">
+svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W * SCALE} {H * SCALE}" width="{W}" height="{H}">
+<g id="municipalities" fill="#ffffff" stroke="#c6cfd9" stroke-width="5.5" stroke-linejoin="round">
 {chr(10).join(muni_paths)}
 </g>
-<g id="provinces" fill="none" stroke="#8494a7" stroke-width="1.1" stroke-linejoin="round" pointer-events="none">
+<g id="provinces" fill="none" stroke="#8494a7" stroke-width="11" stroke-linejoin="round" pointer-events="none">
 {chr(10).join(prov_paths)}
 </g>
 <g id="muniLabels" font-family="Pretendard Variable, Pretendard, -apple-system, sans-serif" fill="#4b5a6b" text-anchor="middle" pointer-events="none">

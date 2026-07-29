@@ -7,6 +7,8 @@
 import json
 import math
 
+from svgutil import SCALE, bbox_of, path_d, q
+
 W, H = 800, 1100
 PAD = 24
 SIMPLIFY_TOL = 0.004
@@ -201,18 +203,12 @@ paths, labels, meta, groups_of = [], [], {}, {}
 
 def emit(code, name, rings, group):
     """SVG path + 라벨 + 메타 추가"""
-    d_parts = []
-    for r in rings:
-        pts = [tr(x, y) for x, y in r]
-        d_parts.append("M" + " L".join(f"{x} {y}" for x, y in pts) + " Z")
-    paths.append(f'  <path id="m{code}" data-name="{name}" data-code="{code}" d="{" ".join(d_parts)}"/>')
+    paths.append(f'  <path id="m{code}" data-name="{name}" data-code="{code}" d="{path_d(rings, tr)}"/>')
     main = max(rings, key=ring_area)
     cx, cy = tr(*ring_centroid(main))
-    pts = [tr(x, y) for x, y in main]
-    xs = [p[0] for p in pts]
-    ys = [p[1] for p in pts]
-    labels.append(f'  <text x="{cx}" y="{cy}" dy=".35em" data-w="{round(max(xs) - min(xs), 1)}" '
-                  f'data-h="{round(max(ys) - min(ys), 1)}" data-code="{code}">{name}</text>')
+    _, _, w, h = bbox_of(main, tr)
+    labels.append(f'  <text x="{q(cx)}" y="{q(cy)}" dy=".35em" data-w="{w}" '
+                  f'data-h="{h}" data-code="{code}">{name}</text>')
     meta[code] = name
     groups_of[code] = group
 
@@ -221,30 +217,14 @@ for jis in sorted(tokyo):
     emit("9" + jis, TOKYO_KO[jis], tokyo[jis], TOKYO_GROUP)
 
 for pid in sorted(prefs):
-    rings = prefs[pid]
     region = REGION_OF[pid]
-    code = str(90000 + region * 1000 + pid)
-    name = PREF_KO[pid]
-    groups_of[code] = str(90 + region)
-    d_parts = []
-    for r in rings:
-        pts = [tr(x, y) for x, y in r]
-        d_parts.append("M" + " L".join(f"{x} {y}" for x, y in pts) + " Z")
-    paths.append(f'  <path id="m{code}" data-name="{name}" data-code="{code}" d="{" ".join(d_parts)}"/>')
-    main = max(rings, key=ring_area)
-    cx, cy = tr(*ring_centroid(main))
-    pts = [tr(x, y) for x, y in main]
-    xs = [p[0] for p in pts]
-    ys = [p[1] for p in pts]
-    labels.append(f'  <text x="{cx}" y="{cy}" dy=".35em" data-w="{round(max(xs) - min(xs), 1)}" '
-                  f'data-h="{round(max(ys) - min(ys), 1)}" data-code="{code}">{name}</text>')
-    meta[code] = name
+    emit(str(90000 + region * 1000 + pid), PREF_KO[pid], prefs[pid], str(90 + region))
 
-svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}">
-<g id="municipalities" fill="#ffffff" stroke="#c6cfd9" stroke-width="0.55" stroke-linejoin="round">
+svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W * SCALE} {H * SCALE}" width="{W}" height="{H}">
+<g id="municipalities" fill="#ffffff" stroke="#c6cfd9" stroke-width="5.5" stroke-linejoin="round">
 {chr(10).join(paths)}
 </g>
-<g id="provinces" fill="none" stroke="#8494a7" stroke-width="1.1" stroke-linejoin="round" pointer-events="none"></g>
+<g id="provinces" fill="none" stroke="#8494a7" stroke-width="11" stroke-linejoin="round" pointer-events="none"></g>
 <g id="muniLabels" font-family="Pretendard Variable, Pretendard, -apple-system, sans-serif" fill="#4b5a6b" text-anchor="middle" pointer-events="none">
 {chr(10).join(labels)}
 </g>

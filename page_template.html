@@ -620,7 +620,7 @@ const MAPS = {};
     provLabelsG: el.querySelector(".g-provlabels"),
     marksG: marks, pathByCode: byCode, bboxCache: {},
     home, vb: { ...home },
-    labelAt: cc === "jp" ? Infinity : 620,   // 이 폭 이하로 확대하면 지역명 표시
+    labelAt: cc === "jp" ? Infinity : 6200,   // 이 폭(SVG 단위) 이하로 확대하면 지역명 표시
   };
 });
 let COUNTRY = "kr";
