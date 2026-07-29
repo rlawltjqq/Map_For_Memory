@@ -8,6 +8,7 @@ Vercel 배포판(api/*.js)과 동일한 API를 제공해서, 배포 전에 로�
 의존성 없음 (파이썬 내장 라이브러리만 사용)
 """
 import hashlib
+import hmac
 import json
 import os
 import re
@@ -95,7 +96,7 @@ class Handler(SimpleHTTPRequestHandler):
         if not meta:
             return None
         token = self.headers.get("x-token", "")
-        return meta if token == token_of(room_id, meta["pwhash"]) else None
+        return meta if hmac.compare_digest(token, token_of(room_id, meta["pwhash"])) else None
 
     # ---------- GET ----------
     def do_GET(self):
@@ -151,7 +152,7 @@ class Handler(SimpleHTTPRequestHandler):
             if not meta:
                 self.send_json({"error": "없는 지도입니다"}, 404)
                 return
-            if hash_pw(body.get("password") or "", meta["salt"]) != meta["pwhash"]:
+            if not hmac.compare_digest(hash_pw(body.get("password") or "", meta["salt"]), meta["pwhash"]):
                 self.send_json({"error": "암호가 틀렸습니다"}, 403)
                 return
             self.send_json({"token": token_of(room_id, meta["pwhash"]), "name": meta["name"]})
@@ -188,7 +189,7 @@ class Handler(SimpleHTTPRequestHandler):
                 if not meta:
                     self.send_json({"error": "unauthorized"}, 403)
                     return
-                if hash_pw(body.get("password") or "", meta["salt"]) != meta["pwhash"]:
+                if not hmac.compare_digest(hash_pw(body.get("password") or "", meta["salt"]), meta["pwhash"]):
                     self.send_json({"error": "비밀번호가 틀렸습니다"}, 403)
                     return
                 country = body.get("country")

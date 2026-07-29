@@ -1885,6 +1885,10 @@ function updateLabels() {
     }
     if (!visited.has(code)) return;
     const x = m.x, y = m.y;
+    // 화면(뷰박스) 밖 마커는 만들지 않는다 — 확대 시 대부분이 여기서 걸러짐
+    const pad = Math.max(m.w, m.h);
+    if (x + pad < vb.x || x - pad > vb.x + vb.w ||
+        y + pad < vb.y || y - pad > vb.y + vb.h) return;
     const emblem = EMBLEMS[code];
     if (emblem) {
       // 지자체 심벌을 지역 안에 반투명하게 채움. 지역 크기에 맞추되 너무 작아지지 않게
