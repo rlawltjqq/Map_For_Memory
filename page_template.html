@@ -877,13 +877,14 @@ async function buildMapImage() {
   try { await document.fonts.ready; } catch {}   // 폰트 로드 후 렌더 (헤더 텍스트용)
   // 1) 지도 SVG 복제 (전국 뷰) + 방문 색 인라인 + 심벌 data URI
   const clone = svg.cloneNode(true);
-  clone.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  // 전국(홈) 뷰로 되돌린다. 좌표계가 SVG 단위이므로 home 값을 그대로 쓴다
+  clone.setAttribute("viewBox", `${home.x} ${home.y} ${home.w} ${home.h}`);
   clone.removeAttribute("id");
   clone.querySelectorAll(".g-munis path").forEach(p => {
     p.classList.remove("visited", "selected");
     p.setAttribute("fill", visited.has(p.dataset.code) ? "#b7e4c7" : "#ffffff");
     p.setAttribute("stroke", "#c6cfd9");
-    p.setAttribute("stroke-width", "0.55");
+    p.setAttribute("stroke-width", "5.5");   // 좌표계가 10배이므로 선 두께도 10배
   });
   // 라벨은 전국 뷰에서 겹치므로 제거, 마커만 다시 그림
   const cLabels = clone.querySelector(".g-labels"); if (cLabels) cLabels.remove();
@@ -897,7 +898,7 @@ async function buildMapImage() {
     if (!visited.has(p.dataset.code)) continue;
     const bb = p.getBBox();
     const em = EMBLEMS[p.dataset.code];
-    const size = Math.min(Math.min(bb.width, bb.height) * 0.9, 26);
+    const size = Math.min(Math.min(bb.width, bb.height) * 0.9, 260);   // 상한도 SVG 단위(10배)
     const pos = labelPos[p.dataset.code] || [bb.x + bb.width / 2, bb.y + bb.height / 2];
     const cx = pos[0], cy = pos[1];
     if (em) {
