@@ -166,11 +166,6 @@
     cursor: pointer; display: none;
   }
   #photoGrid .ph:hover .del { display: block; }
-  .upload-btn {
-    display: block; text-align: center; font-size: 13px; padding: 8px; border-radius: 8px;
-    border: 1px dashed #9ca3af; color: #4b5563; cursor: pointer; background: #fff;
-  }
-  .upload-btn:hover { background: #f3f4f6; }
   #uploadMsg { font-size: 11.5px; color: #9ca3af; text-align: center; margin-top: 6px; }
   /* 방문 기록 (여러 번 방문 지원) */
   .sec-head {
@@ -298,7 +293,6 @@
   .mem-head img { width: 26px; height: 26px; object-fit: contain; }
   .mem-title { font-size: 13.5px; font-weight: 700; color: #1f2937; }
   .mem-prov { font-size: 11px; color: #9ca3af; }
-  .mem-date { margin-left: auto; font-size: 11.5px; color: #6b7280; }
   .mem-count {
     margin-left: auto; font-size: 11px; color: #2d6a4f; background: #dcf5e8;
     padding: 2px 8px; border-radius: 999px; flex-shrink: 0;
@@ -306,7 +300,6 @@
   .mem-visit { display: flex; gap: 7px; font-size: 12.5px; line-height: 1.5; margin-bottom: 5px; }
   .mem-vdate { color: #2d6a4f; font-weight: 600; flex-shrink: 0; font-variant-numeric: tabular-nums; }
   .mem-vmemo { color: #4b5563; white-space: pre-wrap; min-width: 0; }
-  .mem-memo { font-size: 12.5px; color: #4b5563; line-height: 1.5; margin-bottom: 8px; white-space: pre-wrap; }
   .mem-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 5px; }
   .mem-photos img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 7px; cursor: pointer; }
   /* 첫 방문 안내 */
@@ -1262,9 +1255,20 @@ const MAPS = {};
   el.insertBefore(marks, el.querySelector(".g-labels"));
   const byCode = {};
   ps.forEach(p => { byCode[p.dataset.code] = p; });
+  const texts = [...el.querySelectorAll(".g-labels text")];
+  // 라벨 수치를 미리 파싱해 둔다 (팬/줌마다 반복 파싱하지 않도록)
+  const meta = texts.map(t => {
+    const w = parseFloat(t.dataset.w) || 0;
+    const h = parseFloat(t.dataset.h) || w;
+    return { t, code: t.dataset.code, w, h, area: w * h,
+             x: +t.getAttribute("x"), y: +t.getAttribute("y"),
+             len: t.textContent.length };
+  });
+  // 큰 지역이 먼저 자리를 차지하도록 미리 정렬 (매 프레임 정렬 제거)
+  const metaByArea = meta.slice().sort((a, b) => b.area - a.area);
   MAPS[cc] = {
     cc, svg: el, paths: ps,
-    muniTexts: [...el.querySelectorAll(".g-labels text")],
+    muniTexts: texts, labelMeta: meta, labelMetaByArea: metaByArea,
     provLabelsG: el.querySelector(".g-provlabels"),
     marksG: marks, pathByCode: byCode, bboxCache: {},
     home, vb: { ...home },
@@ -1273,11 +1277,12 @@ const MAPS = {};
 });
 let COUNTRY = "kr";
 // 활성 지도 참조 (나라를 바꾸면 다시 바인딩)
-let svg, paths, muniTexts, provLabelsG, marksG, pathByCode, bboxCache, home, vb;
+let svg, paths, muniTexts, labelMeta, labelMetaByArea, provLabelsG, marksG, pathByCode, bboxCache, home, vb;
 function bindMap(cc) {
   const m = MAPS[cc];
   COUNTRY = cc;
   svg = m.svg; paths = m.paths; muniTexts = m.muniTexts; provLabelsG = m.provLabelsG;
+  labelMeta = m.labelMeta; labelMetaByArea = m.labelMetaByArea;
   marksG = m.marksG; pathByCode = m.pathByCode; bboxCache = m.bboxCache;
   home = m.home; vb = m.vb;
 }
@@ -2491,46 +2496,47 @@ function updateLabels() {
   provLabelsG.style.display = showMuni ? "none" : "";
 
   // --- 어떤 시·군·구 이름을 보일지: 큰 지역 우선 + 겹치면 숨김 ---
-  const labelShownMap = {};
+  // (수치는 labelMeta에 미리 파싱, 정렬도 미리 해둠 — 팬/줌마다 재계산하지 않음)
+  const shownSet = new Set();
   if (showMuni) {
+    const sx0 = rect.left - vb.x / vb.w * rect.width, kx = rect.width / vb.w;
+    const sy0 = rect.top - vb.y / vb.h * rect.height, ky = rect.height / vb.h;
     const placed = [];
-    const order = muniTexts.slice().sort((a, b) =>
-      (parseFloat(b.dataset.w) * parseFloat(b.dataset.h || b.dataset.w)) -
-      (parseFloat(a.dataset.w) * parseFloat(a.dataset.h || a.dataset.w)));
-    for (const t of order) {
-      const nameLen = t.textContent.length;
-      const isSel = t.dataset.code === selected;
+    for (const m of labelMetaByArea) {
+      const isSel = m.code === selected;
       // 선택한 지역은 작아도(폭이 좁아도) 이름을 보여준다
-      const fits = parseFloat(t.dataset.w) * pxPerUnit > nameLen * 11 + 8;
-      if (!fits && !isSel) { labelShownMap[t.dataset.code] = false; continue; }
-      const cxU = +t.getAttribute("x"), cyU = +t.getAttribute("y");
-      const sx = rect.left + (cxU - vb.x) / vb.w * rect.width;
-      const sy = rect.top + (cyU - vb.y) / vb.h * rect.height;
-      const halfW = nameLen * 11 / 2 + 4, halfH = 9;
-      const box = { l: sx - halfW, t: sy - halfH, r: sx + halfW, b: sy + halfH };
+      if (!isSel && m.w * pxPerUnit <= m.len * 11 + 8) continue;
+      const sx = sx0 + m.x * kx, sy = sy0 + m.y * ky;
+      const halfW = m.len * 5.5 + 4;
+      const l = sx - halfW, r = sx + halfW, t = sy - 9, b = sy + 9;
+      // 화면 밖 라벨은 겹침 계산에서 제외 (가장 큰 절감)
+      if (r < rect.left || l > rect.right || b < rect.top || t > rect.bottom) continue;
       // 선택한 지역 이름은 겹쳐도 항상 표시 (어느 지역인지 헷갈리지 않게)
-      const hit = !isSel &&
-        placed.some(p => !(box.r < p.l || box.l > p.r || box.b < p.t || box.t > p.b));
-      if (hit) { labelShownMap[t.dataset.code] = false; }
-      else { labelShownMap[t.dataset.code] = true; placed.push(box); }
+      let hit = false;
+      if (!isSel) {
+        for (let i = 0; i < placed.length; i++) {
+          const p = placed[i];
+          if (!(r < p.l || l > p.r || b < p.t || t > p.b)) { hit = true; break; }
+        }
+      }
+      if (!hit) { shownSet.add(m.code); placed.push({ l, r, t, b }); }
     }
   }
   const marks = [];
-  muniTexts.forEach(t => {
-    const labelShown = showMuni && !!labelShownMap[t.dataset.code];
+  labelMeta.forEach(m => {
+    const t = m.t, code = m.code;
+    const labelShown = showMuni && shownSet.has(code);
     t.style.display = labelShown ? "" : "none";
     if (labelShown) {
-      t.classList.toggle("on-visited", visited.has(t.dataset.code));
-      t.classList.toggle("sel-label", t.dataset.code === selected);
+      t.classList.toggle("on-visited", visited.has(code));
+      t.classList.toggle("sel-label", code === selected);
     }
-    if (!visited.has(t.dataset.code)) return;
-    const x = +t.getAttribute("x");
-    const y = +t.getAttribute("y");
-    const emblem = EMBLEMS[t.dataset.code];
+    if (!visited.has(code)) return;
+    const x = m.x, y = m.y;
+    const emblem = EMBLEMS[code];
     if (emblem) {
       // 지자체 심벌을 지역 안에 반투명하게 채움. 지역 크기에 맞추되 너무 작아지지 않게
-      const w = parseFloat(t.dataset.w);
-      const h = parseFloat(t.dataset.h) || w;
+      const w = m.w, h = m.h;
       // 심벌이 지역 경계를 넘지 않도록 지역 크기 안에 가둔다.
       const fontSvg = 11 / pxPerUnit;
       const availW = w * 0.86;
@@ -2547,7 +2553,7 @@ function updateLabels() {
       let cx = x;
       let cy = labelShown ? (y - fontSvg * 0.5 - 2 / pxPerUnit - half) : y;
       // 심벌 상자를 지역 bbox 안으로 강제 클램프 (경계 밖으로 삐져나오지 않게)
-      const bb = regionBBox(t.dataset.code);
+      const bb = regionBBox(code);
       if (bb) {
         if (bb.width > size) cx = Math.min(Math.max(cx, bb.x + half), bb.x + bb.width - half);
         else cx = bb.x + bb.width / 2;
