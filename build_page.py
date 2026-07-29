@@ -53,6 +53,12 @@ emblems = {
     for code, url in emblems.items()
 }
 
+# 지도에 없는 코드(예: 도쿄 통합 후 남은 시·구)는 페이지에 넣지 않는다.
+# 파일은 그대로 두어 SPLIT_TOKYO를 다시 켜면 재사용된다.
+map_codes = set(re.findall(r'data-code="(\d+)"', svg + svg_jp))
+dropped = len(emblems) - len(map_codes & set(emblems))
+emblems = {c: u for c, u in emblems.items() if c in map_codes}
+
 html = html.replace("__PROV__", json.dumps(prov_short, ensure_ascii=False))
 html = html.replace("__PROV_JP__", json.dumps(jp_meta["regions"], ensure_ascii=False))
 html = html.replace("__EMBLEMS__", json.dumps(emblems, ensure_ascii=False))
@@ -61,4 +67,4 @@ html = html.replace("__SVG_JP__", svg_jp)
 
 with open("index.html", "w", encoding="utf-8") as f:
     f.write(html)
-print("index.html written,", len(html), "bytes")
+print(f"index.html written, {len(html)} bytes (미사용 심벌 {dropped}개 제외)")
