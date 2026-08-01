@@ -97,7 +97,93 @@ def load_features(path):
     return out
 
 
-muni = load_features("korea_municipalities.geojson")
+def merge_general_gu(features):
+    """일반구(전주시완산구·용인시수지구 등)를 모도시 하나로 합친다.
+
+    구끼리 맞닿은 내부 경계선은 '두 링이 공유하는 변'을 지우는 방식으로 제거한다.
+    (광역시의 자치구는 이름이 '○○시○○구' 형태가 아니므로 영향받지 않는다.)
+    """
+    import re as _re
+    from collections import defaultdict
+
+    groups, singles = defaultdict(list), []
+    for props, rings in features:
+        m = _re.match(r"^(.+?시)(.+구)$", props["name"])
+        if m and rings:
+            groups[m.group(1)].append((props, rings))
+        else:
+            singles.append((props, rings))
+
+    merged = []
+    for city, members in groups.items():
+        if len(members) == 1:                      # 구가 하나뿐이면 이름만 정리
+            props, rings = members[0]
+            props = dict(props, name=city)
+            merged.append((props, rings))
+            continue
+        # 대표 코드: 가장 작은 코드(보통 시 본청 기준)
+        members.sort(key=lambda mp: mp[0]["code"])
+        base = dict(members[0][0], name=city)
+        all_rings = [r for _, rings in members for r in rings]
+        merged.append((base, union_rings(all_rings)))
+
+    return singles + merged
+
+
+def union_rings(rings):
+    """여러 폴리곤 링을 합집합으로 — 공유하는 변(내부 경계)을 지우고 외곽만 남긴다."""
+    # 좌표를 격자에 스냅해 부동소수 오차로 변이 어긋나는 것을 방지
+    def key(p):
+        return (round(p[0], 6), round(p[1], 6))
+
+    edge_count = defaultdict_int()
+    for ring in rings:
+        pts = [key(p) for p in ring]
+        if pts[0] != pts[-1]:
+            pts.append(pts[0])
+        for a, b in zip(pts, pts[1:]):
+            if a == b:
+                continue
+            edge_count[(a, b) if a < b else (b, a)] += 1
+
+    # 한 번만 등장하는 변 = 바깥 경계 (두 번이면 두 구가 맞댄 내부 경계)
+    adj = {}
+    for (a, b), n in edge_count.items():
+        if n != 1:
+            continue
+        adj.setdefault(a, []).append(b)
+        adj.setdefault(b, []).append(a)
+
+    out, used = [], set()
+    for start in list(adj):
+        if start in used or not adj.get(start):
+            continue
+        loop, cur, prev = [start], start, None
+        used.add(start)
+        while True:
+            nxts = [p for p in adj.get(cur, []) if p != prev and (p not in used or p == start)]
+            if not nxts:
+                break
+            nxt = nxts[0]
+            if nxt == start:
+                break
+            loop.append(nxt)
+            used.add(nxt)
+            prev, cur = cur, nxt
+        if len(loop) >= 4:
+            loop.append(loop[0])
+            out.append([list(p) for p in loop])
+    out.sort(key=ring_area, reverse=True)
+    # 합쳐지지 않았다면(예외) 원본을 그대로 사용
+    return out if out else rings
+
+
+def defaultdict_int():
+    from collections import defaultdict
+    return defaultdict(int)
+
+
+muni = merge_general_gu(load_features("korea_municipalities.geojson"))
 prov = load_features("korea_provinces.geojson")
 
 minx = miny = 1e9

@@ -756,12 +756,26 @@ function startApp(state) {
   clearInterval(pollTimer);
   pollTimer = setInterval(refresh, 12000);   // 다른 사람의 변경 반영
 }
-// 도쿄를 도(都) 하나로 합치기 전에 남은 시·구 코드(913xxx) 기록을 도쿄도(93013)로 이관.
-// 비파괴: 방문·메모를 도쿄도로 합치고 유령 코드만 제거. (사진은 그대로 두어 유실 없음)
+// 지도에서 합쳐진 지역의 옛 코드를 새 코드로 이관한다.
+//  - 도쿄 시·구(913xxx) → 도쿄도(93013)
+//  - 한국 일반구(용인시수지구 등) → 모도시 (전주·청주·창원·용인 등 12개시)
+const MERGED_CODES = {"38115": "38111", "38114": "38111", "38113": "38111", "38112": "38111", "37012": "37011", "35012": "35011", "34012": "34011", "33012": "33011", "31193": "31191", "31192": "31191", "31104": "31101", "31103": "31101", "31092": "31091", "31053": "31051", "31052": "31051", "31042": "31041", "31023": "31021", "31022": "31021", "31014": "31011", "31013": "31011", "31012": "31011"};
+function mergedTargetOf(code) {
+  if (/^913\d{3}$/.test(code)) return "93013";
+  return MERGED_CODES[code] || null;
+}
 function migrateTokyoWards() {
-  const wardRe = /^913\d{3}$/, T = "93013";
-  const wardVisits = [...visited].filter(c => wardRe.test(c));
-  const wardNotes = Object.keys(notes).filter(c => wardRe.test(c));
+  const pairs = [];
+  [...visited, ...Object.keys(notes)].forEach(c => {
+    const t = mergedTargetOf(String(c));
+    if (t && !pairs.some(p => p[0] === String(c))) pairs.push([String(c), t]);
+  });
+  if (!pairs.length) return;
+  pairs.forEach(([from, to]) => migrateOne(from, to));
+}
+function migrateOne(from, T) {
+  const wardVisits = visited.has(from) ? [from] : [];
+  const wardNotes = notes[from] ? [from] : [];
   if (!wardVisits.length && !wardNotes.length) return;
   markDirty(T);
   // 방문 이관
