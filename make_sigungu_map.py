@@ -76,13 +76,27 @@ def is_dokdo(ring):
 
 
 def load_features(path):
+    """GeoJSON을 원본 좌표 그대로 읽는다 (선 단순화·작은 섬 제거는 refine에서)."""
     with open(path, encoding="utf-8") as f:
         gj = json.load(f)
     out = []
     for feat in gj["features"]:
         geom = feat["geometry"]
         polys = geom["coordinates"] if geom["type"] == "MultiPolygon" else [geom["coordinates"]]
-        rings_raw = [ring for poly in polys for ring in poly]
+        rings = [ring for poly in polys for ring in poly]
+        rings.sort(key=ring_area, reverse=True)
+        out.append((feat["properties"], rings))
+    return out
+
+
+def refine(features):
+    """작은 섬을 걸러내고 선을 단순화한다.
+
+    반드시 merge_general_gu 뒤에 호출할 것. 구별로 먼저 단순화하면 맞닿은 경계의
+    좌표가 서로 어긋나 합집합이 내부 경계를 못 지우고 도형이 깨진다.
+    """
+    out = []
+    for props, rings_raw in features:
         rings_raw.sort(key=ring_area, reverse=True)
         rings = []
         for i, ring in enumerate(rings_raw):
@@ -93,7 +107,7 @@ def load_features(path):
             simp = dp_simplify(ring, 0.00005 if dok else SIMPLIFY_TOL)
             if len(simp) >= 4:
                 rings.append(simp)
-        out.append((feat["properties"], rings))
+        out.append((props, rings))
     return out
 
 
@@ -130,61 +144,61 @@ def merge_general_gu(features):
     return singles + merged
 
 
-def union_rings(rings):
-    """여러 폴리곤 링을 합집합으로 — 공유하는 변(내부 경계)을 지우고 외곽만 남긴다."""
-    # 좌표를 격자에 스냅해 부동소수 오차로 변이 어긋나는 것을 방지
-    def key(p):
-        return (round(p[0], 6), round(p[1], 6))
+def signed_area(pts):
+    a = 0.0
+    for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+        a += x0 * y1 - x1 * y0
+    return a / 2
 
-    edge_count = defaultdict_int()
+
+def union_rings(rings):
+    """여러 폴리곤을 하나로 합친다.
+
+    모든 링의 회전 방향을 맞춰 놓으면, 두 구가 맞댄 내부 경계는 같은 변이 서로
+    '반대 방향'으로 한 번씩 나타난다. 이 쌍을 상쇄시키고 남은 변만 이어 붙이면
+    바깥 외곽선만 남는다.
+    """
+    from collections import Counter, defaultdict
+
+    def key(p):
+        return (round(p[0], 7), round(p[1], 7))
+
+    edges = Counter()
     for ring in rings:
         pts = [key(p) for p in ring]
         if pts[0] != pts[-1]:
             pts.append(pts[0])
+        if signed_area(pts) < 0:          # 회전 방향을 반시계로 통일
+            pts.reverse()
         for a, b in zip(pts, pts[1:]):
             if a == b:
                 continue
-            edge_count[(a, b) if a < b else (b, a)] += 1
+            if edges[(b, a)]:             # 반대 방향 변 = 내부 경계 → 상쇄
+                edges[(b, a)] -= 1
+            else:
+                edges[(a, b)] += 1
 
-    # 한 번만 등장하는 변 = 바깥 경계 (두 번이면 두 구가 맞댄 내부 경계)
-    adj = {}
-    for (a, b), n in edge_count.items():
-        if n != 1:
-            continue
-        adj.setdefault(a, []).append(b)
-        adj.setdefault(b, []).append(a)
+    nxt = defaultdict(list)
+    for (a, b), n in edges.items():
+        nxt[a].extend([b] * n)
 
-    out, used = [], set()
-    for start in list(adj):
-        if start in used or not adj.get(start):
-            continue
-        loop, cur, prev = [start], start, None
-        used.add(start)
-        while True:
-            nxts = [p for p in adj.get(cur, []) if p != prev and (p not in used or p == start)]
-            if not nxts:
-                break
-            nxt = nxts[0]
-            if nxt == start:
-                break
-            loop.append(nxt)
-            used.add(nxt)
-            prev, cur = cur, nxt
-        if len(loop) >= 4:
-            loop.append(loop[0])
-            out.append([list(p) for p in loop])
+    out = []
+    for start in list(nxt):
+        while nxt[start]:
+            loop, cur = [start], nxt[start].pop()
+            while cur != start and nxt[cur]:
+                loop.append(cur)
+                cur = nxt[cur].pop()
+            if cur == start and len(loop) >= 3:   # 닫힌 고리만 사용
+                loop.append(loop[0])
+                out.append([list(p) for p in loop])
     out.sort(key=ring_area, reverse=True)
     # 합쳐지지 않았다면(예외) 원본을 그대로 사용
     return out if out else rings
 
 
-def defaultdict_int():
-    from collections import defaultdict
-    return defaultdict(int)
-
-
-muni = merge_general_gu(load_features("korea_municipalities.geojson"))
-prov = load_features("korea_provinces.geojson")
+muni = refine(merge_general_gu(load_features("korea_municipalities.geojson")))
+prov = refine(load_features("korea_provinces.geojson"))
 
 minx = miny = 1e9
 maxx = maxy = -1e9
