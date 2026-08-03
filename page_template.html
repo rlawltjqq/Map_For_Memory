@@ -1872,7 +1872,8 @@ function updateLabels() {
     for (const m of labelMetaByArea) {
       const isSel = m.code === selected;
       // 선택한 지역은 작아도(폭이 좁아도) 이름을 보여준다
-      if (!isSel && m.w * pxPerUnit <= m.len * 11 + 8) continue;
+      // (data-w가 라벨 자리의 실제 내부 폭이라 여백을 따로 두지 않는다)
+      if (!isSel && m.w * pxPerUnit <= m.len * 11) continue;
       const sx = sx0 + m.x * kx, sy = sy0 + m.y * ky;
       const halfW = m.len * 5.5 + 4;
       const l = sx - halfW, r = sx + halfW, t = sy - 9, b = sy + 9;

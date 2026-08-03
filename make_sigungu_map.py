@@ -256,12 +256,65 @@ def to_path(props, rings, with_fill_id=True):
     return f'  <path {attrs} d="{d}"/>'
 
 
+def point_in_rings(pt, rings):
+    x, y = pt
+    hit = False
+    for r in rings:
+        rr = r if r[0] == r[-1] else r + [r[0]]
+        for (x0, y0), (x1, y1) in zip(rr, rr[1:]):
+            if (y0 > y) != (y1 > y) and x < (x1 - x0) * (y - y0) / (y1 - y0) + x0:
+                hit = not hit
+    return hit
+
+
+def interior_point(rings, near=None):
+    """이름을 실제로 쓸 수 있는 라벨 자리와, 그 자리의 가로 폭.
+
+    가로선을 여러 개 그어 도형 내부 구간을 모은 뒤 가장 넓은 곳을 고른다.
+    무게중심은 초승달(달성군)·도넛(청원군)·분리형 지역에서 도형 밖이나 좁은
+    목에 떨어지는데, 그러면 이름이 옆 동네에 찍히거나 표시 규칙이 폭을 과대
+    평가해 글자가 지역을 넘친다.
+
+    모든 링의 교차점을 한 번에 모아 짝지으므로 구멍(청원군 안의 청주시)과
+    떨어진 조각은 자연히 제외된다. near를 주면 비슷하게 넓은 자리 중
+    그 점(보통 무게중심)에 가장 가까운 곳을 골라 라벨이 괜히 튀지 않게 한다.
+    """
+    ys = [p[1] for r in rings for p in r]
+    y0, y1 = min(ys), max(ys)
+    closed = [r if r[0] == r[-1] else r + [r[0]] for r in rings]
+    spans = []
+    for i in range(1, 120):
+        y = y0 + (y1 - y0) * i / 120
+        xs = []
+        for rr in closed:
+            for (ax, ay), (bx, by) in zip(rr, rr[1:]):
+                if (ay > y) != (by > y):
+                    xs.append((bx - ax) * (y - ay) / (by - ay) + ax)
+        xs.sort()
+        spans += [(b - a, (a + b) / 2, y) for a, b in zip(xs[0::2], xs[1::2])]
+    if not spans:
+        return None
+    widest = max(s[0] for s in spans)
+    if near is None:
+        return max(spans, key=lambda s: s[0])
+    # 최대 폭의 90% 이상인 자리들 중 무게중심에 가장 가까운 곳
+    good = [s for s in spans if s[0] >= widest * 0.9]
+    return min(good, key=lambda s: math.hypot(s[1] - near[0], s[2] - near[1]))
+
+
 def label_of(props, rings, text):
     # 가장 큰 링의 무게중심에 라벨, data-w/h = 그 링의 투영 크기 (라벨·마커 크기 판단용)
     main = rings[0]
-    cx, cy = tr(*ring_centroid(main))
+    cx, cy = ring_centroid(main)
     _, _, w, h = bbox_of(main, tr)
-    return (f'  <text x="{q(cx)}" y="{q(cy)}" dy=".35em" data-w="{w}" data-h="{h}" '
+    # data-w는 '이름이 들어갈 자리가 되는지' 판단에 쓰인다. bbox 폭은 초승달·
+    # 분리형 지역에서 실제 여유보다 크게 나오므로, 라벨 자리의 실제 내부 폭을 쓴다.
+    best = interior_point(rings, near=(cx, cy))
+    if best:
+        span, cx, cy = best
+        w = min(w, q(span * kx * scale))
+    px, py = tr(cx, cy)
+    return (f'  <text x="{q(px)}" y="{q(py)}" dy=".35em" data-w="{w}" data-h="{h}" '
             f'data-code="{props["code"]}">{text}</text>')
 
 
