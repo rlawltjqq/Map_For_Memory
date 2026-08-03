@@ -1514,8 +1514,9 @@ async function buildMapImage() {
   const cMarks = clone.querySelector(".g-marks"); if (cMarks) cMarks.remove();
   // 방문 심벌을 지역 라벨 중심(가장 큰 섬의 무게중심)에 data URI로 배치
   // — bbox 중심을 쓰면 먼 섬(이즈 제도 등)이 포함된 지역은 마커가 바다로 밀림
+  // 겹침 회피로 밀어낸 y가 아니라 원래 라벨 좌표를 쓴다 (내보내기는 전국 뷰라 이동값이 무의미)
   const labelPos = {};
-  muniTexts.forEach(t => { labelPos[t.dataset.code] = [+t.getAttribute("x"), +t.getAttribute("y")]; });
+  labelMeta.forEach(m => { labelPos[m.code] = [m.x, m.y]; });
   const markG = document.createElementNS("http://www.w3.org/2000/svg", "g");
   for (const p of paths) {
     if (!visited.has(p.dataset.code)) continue;
@@ -2462,6 +2463,8 @@ document.addEventListener("click", (e) => {
   if (!$("searchWrap").contains(e.target)) closeSearch();
 });
 
+// 이름이 겹칠 때 시도해 볼 세로 이동량(px). 0=제자리부터 위아래로 번갈아 넓혀간다.
+const LABEL_NUDGE = [0, -7, 7, -14, 14, -21, 21, -28, 28];
 function updateLabels() {
   const rect = svg.getBoundingClientRect();
   if (!rect.width) return;
@@ -2471,9 +2474,10 @@ function updateLabels() {
   const showMuni = vb.w <= MAPS[COUNTRY].labelAt;
   provLabelsG.style.display = showMuni ? "none" : "";
 
-  // --- 어떤 시·군·구 이름을 보일지: 큰 지역 우선 + 겹치면 숨김 ---
+  // --- 어떤 시·군·구 이름을 보일지: 큰 지역 우선, 겹치면 위아래로 밀어보고 그래도 안 되면 숨김 ---
   // (수치는 labelMeta에 미리 파싱, 정렬도 미리 해둠 — 팬/줌마다 재계산하지 않음)
   const shownSet = new Set();
+  const offsets = new Map();        // code -> 세로 이동량(SVG 단위)
   if (showMuni) {
     const sx0 = rect.left - vb.x / vb.w * rect.width, kx = rect.width / vb.w;
     const sy0 = rect.top - vb.y / vb.h * rect.height, ky = rect.height / vb.h;
@@ -2485,20 +2489,33 @@ function updateLabels() {
       if (!isSel && m.w * pxPerUnit <= m.len * 11) continue;
       const sx = sx0 + m.x * kx, sy = sy0 + m.y * ky;
       // 겹침 판정 상자는 글자가 차지하는 크기에 맞춘다 (11px 글자 = 글자당 폭 11).
-      // 예전에는 여백이 넉넉해 실제로는 안 겹치는 이름끼리 서로를 지웠다.
+      // 여백이 넉넉하면 실제로는 안 겹치는 이름끼리 서로를 지운다.
       const halfW = m.len * 5.5 + 1;
-      const l = sx - halfW, r = sx + halfW, t = sy - 7, b = sy + 7;
+      const l = sx - halfW, r = sx + halfW;
       // 화면 밖 라벨은 겹침 계산에서 제외 (가장 큰 절감)
-      if (r < rect.left || l > rect.right || b < rect.top || t > rect.bottom) continue;
-      // 선택한 지역 이름은 겹쳐도 항상 표시 (어느 지역인지 헷갈리지 않게)
-      let hit = false;
-      if (!isSel) {
-        for (let i = 0; i < placed.length; i++) {
-          const p = placed[i];
-          if (!(r < p.l || l > p.r || b < p.t || t > p.b)) { hit = true; break; }
+      if (r < rect.left || l > rect.right) continue;
+      // 자리가 없으면 지역 안에서 위아래로 조금씩 밀어 빈 곳을 찾는다.
+      // 이동 한계는 지역 높이의 절반 — 이름이 자기 지역을 벗어나지 않게.
+      const room = Math.max(0, m.h * ky / 2 - 7);
+      for (let i = 0; i < LABEL_NUDGE.length; i++) {
+        const dy = LABEL_NUDGE[i];
+        if (Math.abs(dy) > room) continue;
+        const t = sy + dy - 7, b = sy + dy + 7;
+        if (b < rect.top || t > rect.bottom) continue;
+        // 선택한 지역 이름은 겹쳐도 항상 표시 (어느 지역인지 헷갈리지 않게)
+        let hit = false;
+        if (!isSel) {
+          for (let j = 0; j < placed.length; j++) {
+            const p = placed[j];
+            if (!(r < p.l || l > p.r || b < p.t || t > p.b)) { hit = true; break; }
+          }
         }
+        if (hit) continue;
+        shownSet.add(m.code);
+        placed.push({ l, r, t, b });
+        if (dy) offsets.set(m.code, dy / ky);
+        break;
       }
-      if (!hit) { shownSet.add(m.code); placed.push({ l, r, t, b }); }
     }
   }
   const marks = [];
@@ -2506,12 +2523,15 @@ function updateLabels() {
     const t = m.t, code = m.code;
     const labelShown = showMuni && shownSet.has(code);
     t.style.display = labelShown ? "" : "none";
+    // 겹침을 피해 밀어낸 만큼 실제로 옮긴다 (바뀔 때만 DOM 갱신)
+    const off = labelShown ? (offsets.get(code) || 0) : 0;
+    if (m.off !== off) { m.off = off; t.setAttribute("y", m.y + off); }
     if (labelShown) {
       t.classList.toggle("on-visited", visited.has(code));
       t.classList.toggle("sel-label", code === selected);
     }
     if (!visited.has(code)) return;
-    const x = m.x, y = m.y;
+    const x = m.x, y = m.y, ly = m.y + off;
     // 화면(뷰박스) 밖 마커는 만들지 않는다 — 확대 시 대부분이 여기서 걸러짐
     const pad = Math.max(m.w, m.h);
     if (x + pad < vb.x || x - pad > vb.x + vb.w ||
@@ -2534,7 +2554,8 @@ function updateLabels() {
       size = Math.min(size, availW, availH);          // 단, 지역을 넘지는 않게 최종 캡
       const half = size / 2;
       let cx = x;
-      let cy = labelShown ? (y - fontSvg * 0.5 - 2 / pxPerUnit - half) : y;
+      // 이름이 밀려났으면 심벌도 그 위로 따라간다 (겹치지 않게)
+      let cy = labelShown ? (ly - fontSvg * 0.5 - 2 / pxPerUnit - half) : y;
       // 심벌 상자를 지역 bbox 안으로 강제 클램프 (경계 밖으로 삐져나오지 않게)
       const bb = regionBBox(code);
       if (bb) {
@@ -2549,7 +2570,7 @@ function updateLabels() {
     } else {
       // 휘장이 없는 지역은 체크 핀으로 (줌 무관 고정 크기)
       const s = 1 / pxPerUnit;
-      const py = y - (labelShown ? 9 / pxPerUnit : 0);
+      const py = labelShown ? ly - 9 / pxPerUnit : y;
       marks.push(
         `<g transform="translate(${x} ${py}) scale(${s})">` +
         `<path d="M0 0C-4.5-6-8-9.2-8-13a8 8 0 1 1 16 0c0 3.8-3.5 7-8 13Z"` +
