@@ -612,9 +612,12 @@ const MAPS = {};
   const meta = texts.map(t => {
     const w = parseFloat(t.dataset.w) || 0;
     const h = parseFloat(t.dataset.h) || w;
-    return { t, code: t.dataset.code, w, h, area: w * h,
+    const name = t.textContent;
+    // 군은 넓은 시골 지역인데도 도시의 작은 구들과 자리 다툼에서 밀리기 쉬워 우선순위를 준다
+    const prio = name.endsWith("군") ? 1.6 : 1;
+    return { t, code: t.dataset.code, w, h, area: w * h * prio,
              x: +t.getAttribute("x"), y: +t.getAttribute("y"),
-             len: t.textContent.length };
+             len: name.length };
   });
   // 큰 지역이 먼저 자리를 차지하도록 미리 정렬 (매 프레임 정렬 제거)
   const metaByArea = meta.slice().sort((a, b) => b.area - a.area);
@@ -1875,8 +1878,10 @@ function updateLabels() {
       // (data-w가 라벨 자리의 실제 내부 폭이라 여백을 따로 두지 않는다)
       if (!isSel && m.w * pxPerUnit <= m.len * 11) continue;
       const sx = sx0 + m.x * kx, sy = sy0 + m.y * ky;
-      const halfW = m.len * 5.5 + 4;
-      const l = sx - halfW, r = sx + halfW, t = sy - 9, b = sy + 9;
+      // 겹침 판정 상자는 글자가 차지하는 크기에 맞춘다 (11px 글자 = 글자당 폭 11).
+      // 예전에는 여백이 넉넉해 실제로는 안 겹치는 이름끼리 서로를 지웠다.
+      const halfW = m.len * 5.5 + 1;
+      const l = sx - halfW, r = sx + halfW, t = sy - 7, b = sy + 7;
       // 화면 밖 라벨은 겹침 계산에서 제외 (가장 큰 절감)
       if (r < rect.left || l > rect.right || b < rect.top || t > rect.bottom) continue;
       // 선택한 지역 이름은 겹쳐도 항상 표시 (어느 지역인지 헷갈리지 않게)
