@@ -30,6 +30,20 @@ export default async function handler(req, res) {
     const list = (await redis.hget(key, code)) || [];
     const idx = list.findIndex((p) => p.url === url);
     if (idx < 0) return res.status(404).json({ error: "not found" });
+
+    // 지역 통합 시 사진의 코드 버킷도 함께 이동
+    const to = typeof req.query.to === "string" && /^\d+$/.test(req.query.to) ? req.query.to : "";
+    if (to && to !== code) {
+      const item = list[idx];
+      const target = (await redis.hget(key, to)) || [];
+      if (!target.some((p) => p.url === url)) target.push(item);
+      await redis.hset(key, { [to]: target });
+      list.splice(idx, 1);
+      if (list.length) await redis.hset(key, { [code]: list });
+      else await redis.hdel(key, code);
+      return res.json({ ok: true, vid: item.vid || "", code: to });
+    }
+
     list[idx] = { ...list[idx], vid: visitId };
     await redis.hset(key, { [code]: list });
     return res.json({ ok: true, vid: visitId });

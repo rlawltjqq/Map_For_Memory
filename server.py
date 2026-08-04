@@ -294,6 +294,8 @@ class Handler(SimpleHTTPRequestHandler):
         code = (q.get("code") or [""])[0]
         vid_raw = (q.get("vid") or [""])[0]
         visit_id = vid_raw if re.fullmatch(r"[\w-]{1,40}", vid_raw or "") else ""
+        to_raw = (q.get("to") or [""])[0]
+        to_code = to_raw if re.fullmatch(r"\d+", to_raw or "") else ""
         target = self.read_json().get("url") or ""
         with _lock:
             rooms = load_rooms()
@@ -306,6 +308,19 @@ class Handler(SimpleHTTPRequestHandler):
             if not item:
                 self.send_json({"error": "not found"}, 404)
                 return
+
+            # 지역 통합 시 사진의 코드 버킷도 함께 이동
+            if to_code and to_code != code:
+                target_files = meta.setdefault("photos", {}).setdefault(to_code, [])
+                if not any(p["url"] == target for p in target_files):
+                    target_files.append(item)
+                files.remove(item)
+                if not files:
+                    del meta["photos"][code]
+                save_rooms(rooms)
+                self.send_json({"ok": True, "vid": item.get("vid", ""), "code": to_code})
+                return
+
             item["vid"] = visit_id
             save_rooms(rooms)
         self.send_json({"ok": True, "vid": visit_id})

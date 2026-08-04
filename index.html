@@ -1358,7 +1358,9 @@ function startApp(state) {
   $("roomName").textContent = state.name;
   rememberRoom(ROOM, state.name, TOKEN);
   applyState(state);
-  migrateTokyoWards();   // 예전 도쿄 시·구 기록을 도쿄도로 이관 (있을 때만)
+  // 통합된 옛 코드(도쿄 시·구, 일반구)의 방문·메모·사진을 새 코드로 이관 (있을 때만).
+  // 비동기라 실패해도 앱 시작은 계속되게 둔다.
+  migrateTokyoWards().catch(() => {});
   setBadge(true);
   updateLabels();
   maybeShowFirstHint();
@@ -1373,20 +1375,22 @@ function mergedTargetOf(code) {
   if (/^913\d{3}$/.test(code)) return "93013";
   return MERGED_CODES[code] || null;
 }
-function migrateTokyoWards() {
+async function migrateTokyoWards() {
   const pairs = [];
-  [...visited, ...Object.keys(notes)].forEach(c => {
+  [...visited, ...Object.keys(notes), ...Object.keys(photos)].forEach(c => {
     const t = mergedTargetOf(String(c));
     if (t && !pairs.some(p => p[0] === String(c))) pairs.push([String(c), t]);
   });
   if (!pairs.length) return;
-  pairs.forEach(([from, to]) => migrateOne(from, to));
+  for (const [from, to] of pairs) await migrateOne(from, to);
 }
-function migrateOne(from, T) {
+async function migrateOne(from, T) {
   const wardVisits = visited.has(from) ? [from] : [];
   const wardNotes = notes[from] ? [from] : [];
-  if (!wardVisits.length && !wardNotes.length) return;
+  const wardPhotos = photos[from] ? [...photos[from]] : [];
+  if (!wardVisits.length && !wardNotes.length && !wardPhotos.length) return;
   markDirty(T);
+  markDirty(from);
   // 방문 이관
   if (wardVisits.length) {
     if (!visited.has(T)) {
@@ -1412,6 +1416,21 @@ function migrateOne(from, T) {
     notes[T] = { visits: merged };
     api("/api/note", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ room: ROOM, code: T, visits: merged }) }).catch(() => {});
+  }
+  // 사진도 이전 지역 코드에서 새 모도시 코드로 이동
+  if (wardPhotos.length) {
+    photos[T] = photos[T] || [];
+    for (const p of wardPhotos) {
+      if (!photos[T].some(x => x.url === p.url)) photos[T].push(p);
+      try {
+        await api(`/api/photo?room=${ROOM}&code=${from}&to=${T}`, {
+          method: "PUT", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: p.url })
+        });
+        photos[from] = (photos[from] || []).filter(x => x.url !== p.url);
+        if (!photos[from].length) delete photos[from];
+      } catch {}
+    }
   }
   paintVisited(); render(); renderFeed();
 }
