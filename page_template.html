@@ -752,9 +752,9 @@ function startApp(state) {
   $("roomName").textContent = state.name;
   rememberRoom(ROOM, state.name, TOKEN);
   applyState(state);
-  // 통합된 옛 코드(도쿄 시·구, 일반구)의 방문·메모·사진을 새 코드로 이관 (있을 때만).
+  // 통합된 옛 코드의 방문·메모·사진을 새 코드로 이관 (있을 때만).
   // 비동기라 실패해도 앱 시작은 계속되게 둔다.
-  migrateTokyoWards().catch(() => {});
+  migrateMergedCodes().catch(() => {});
   setBadge(true);
   updateLabels();
   maybeShowFirstHint();
@@ -769,55 +769,56 @@ function mergedTargetOf(code) {
   if (/^913\d{3}$/.test(code)) return "93013";
   return MERGED_CODES[code] || null;
 }
-async function migrateTokyoWards() {
+// 통합으로 사라진 옛 코드(도쿄 시·구, 일반구)의 기록을 새 코드로 옮긴다
+async function migrateMergedCodes() {
   const pairs = [];
   [...visited, ...Object.keys(notes), ...Object.keys(photos)].forEach(c => {
     const t = mergedTargetOf(String(c));
     if (t && !pairs.some(p => p[0] === String(c))) pairs.push([String(c), t]);
   });
   if (!pairs.length) return;
-  for (const [from, to] of pairs) await migrateOne(from, to);
+  for (const [from, to] of pairs) await migrateCode(from, to);
 }
-async function migrateOne(from, T) {
-  const wardVisits = visited.has(from) ? [from] : [];
-  const wardNotes = notes[from] ? [from] : [];
-  const wardPhotos = photos[from] ? [...photos[from]] : [];
-  if (!wardVisits.length && !wardNotes.length && !wardPhotos.length) return;
-  markDirty(T);
+async function migrateCode(from, to) {
+  const oldVisits = visited.has(from) ? [from] : [];
+  const oldNotes = notes[from] ? [from] : [];
+  const oldPhotos = photos[from] ? [...photos[from]] : [];
+  if (!oldVisits.length && !oldNotes.length && !oldPhotos.length) return;
+  markDirty(to);
   markDirty(from);
   // 방문 이관
-  if (wardVisits.length) {
-    if (!visited.has(T)) {
-      visited.add(T);
+  if (oldVisits.length) {
+    if (!visited.has(to)) {
+      visited.add(to);
       api("/api/visited", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ room: ROOM, code: T, on: true }) }).catch(() => {});
+        body: JSON.stringify({ room: ROOM, code: to, on: true }) }).catch(() => {});
     }
-    wardVisits.forEach(c => {
+    oldVisits.forEach(c => {
       visited.delete(c); markDirty(c);
       api("/api/visited", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ room: ROOM, code: c, on: false }) }).catch(() => {});
     });
   }
   // 메모(방문 기록) 이관
-  if (wardNotes.length) {
-    const merged = getVisits(T);
-    wardNotes.forEach(c => {
+  if (oldNotes.length) {
+    const merged = getVisits(to);
+    oldNotes.forEach(c => {
       getVisits(c).forEach(v => merged.push({ id: v.id || newVid(), start: v.start, end: v.end, memo: v.memo }));
       delete notes[c]; markDirty(c);
       api("/api/note", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ room: ROOM, code: c, visits: [] }) }).catch(() => {});
     });
-    notes[T] = { visits: merged };
+    notes[to] = { visits: merged };
     api("/api/note", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ room: ROOM, code: T, visits: merged }) }).catch(() => {});
+      body: JSON.stringify({ room: ROOM, code: to, visits: merged }) }).catch(() => {});
   }
   // 사진도 이전 지역 코드에서 새 모도시 코드로 이동
-  if (wardPhotos.length) {
-    photos[T] = photos[T] || [];
-    for (const p of wardPhotos) {
-      if (!photos[T].some(x => x.url === p.url)) photos[T].push(p);
+  if (oldPhotos.length) {
+    photos[to] = photos[to] || [];
+    for (const p of oldPhotos) {
+      if (!photos[to].some(x => x.url === p.url)) photos[to].push(p);
       try {
-        await api(`/api/photo?room=${ROOM}&code=${from}&to=${T}`, {
+        await api(`/api/photo?room=${ROOM}&code=${from}&to=${to}`, {
           method: "PUT", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ url: p.url })
         });
