@@ -8,7 +8,7 @@ from svgutil import SCALE, bbox_of, path_d, q
 W, H = 800, 1100
 PAD = 20
 SIMPLIFY_TOL = 0.002
-MIN_RING_AREA = 0.0008
+MIN_RING_AREA = 0.00005
 
 PROV_SHORT = {"서울특별시": "서울", "부산광역시": "부산", "대구광역시": "대구", "인천광역시": "인천",
               "광주광역시": "광주", "대전광역시": "대전", "울산광역시": "울산", "세종특별자치시": "세종",
@@ -104,7 +104,15 @@ def refine(features):
             # 독도는 아주 작아 일반 필터·단순화에 사라지므로 예외 처리
             if i > 0 and not dok and ring_area(ring) < MIN_RING_AREA:
                 continue
-            simp = dp_simplify(ring, 0.00005 if dok else SIMPLIFY_TOL)
+            # 단순화 강도를 섬 크기에 맞춘다. 본토 기준 강도를 작은 섬에 그대로
+            # 쓰면 삼각형으로 뭉개지거나 점이 모자라 아예 사라진다.
+            if dok:
+                tol = 0.00005
+            else:
+                span = max(max(p[0] for p in ring) - min(p[0] for p in ring),
+                           max(p[1] for p in ring) - min(p[1] for p in ring))
+                tol = min(SIMPLIFY_TOL, span / 25)
+            simp = dp_simplify(ring, tol)
             if len(simp) >= 4:
                 rings.append(simp)
         out.append((props, rings))
