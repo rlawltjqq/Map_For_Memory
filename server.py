@@ -277,9 +277,13 @@ class Handler(SimpleHTTPRequestHandler):
                     files = meta.setdefault("photos", {}).setdefault(code, [])
                     if not any(p["url"] == link_url for p in files):
                         v = body.get("vid") or ""
-                        files.append({"url": link_url,
-                                      "name": safe_name(body.get("name") or "photo.jpg"),
-                                      "vid": v if re.fullmatch(r"[\w-]{1,40}", v) else ""})
+                        item = {"url": link_url,
+                                "name": safe_name(body.get("name") or "photo.jpg"),
+                                "vid": v if re.fullmatch(r"[\w-]{1,40}", v) else ""}
+                        th = body.get("thumb") or ""
+                        if th.startswith("/data/photos/") and ".." not in th:
+                            item["thumb"] = th
+                        files.append(item)
                     save_rooms(rooms)
                 self.send_json({"ok": True, "url": link_url})
                 return
@@ -295,9 +299,26 @@ class Handler(SimpleHTTPRequestHandler):
                     self.send_json({"error": "empty body"}, 400)
                     return
                 name = safe_name(self.headers.get("X-Filename", "photo.jpg"))
-                fname = f"{int(time.time() * 1000)}_{name}"
                 folder = os.path.join(PHOTO_DIR, room_id, code)
                 os.makedirs(folder, exist_ok=True)
+
+                # 목록용 작은 사진 — 원본 주소를 thumbfor로 받아 같은 항목에 붙인다
+                thumb_for = (q.get("thumbfor") or [""])[0]
+                if thumb_for:
+                    files = meta.setdefault("photos", {}).setdefault(code, [])
+                    item = next((p for p in files if p["url"] == thumb_for), None)
+                    if not item:
+                        self.send_json({"error": "not found"}, 404)
+                        return
+                    tname = f"t_{int(time.time() * 1000)}_{name}"
+                    with open(os.path.join(folder, tname), "wb") as f:
+                        f.write(data)
+                    item["thumb"] = f"/data/photos/{room_id}/{code}/{tname}"
+                    save_rooms(rooms)
+                    self.send_json({"ok": True, "thumb": item["thumb"]})
+                    return
+
+                fname = f"{int(time.time() * 1000)}_{name}"
                 with open(os.path.join(folder, fname), "wb") as f:
                     f.write(data)
                 url_path = f"/data/photos/{room_id}/{code}/{fname}"
@@ -392,11 +413,12 @@ class Handler(SimpleHTTPRequestHandler):
                 if not files:
                     del meta["photos"][code]
                 save_rooms(rooms)
-                # url → 실제 파일 경로 (data/photos 아래만 허용)
-                rel = os.path.normpath(unquote(target).lstrip("/"))
-                path = os.path.join(ROOT, rel)
-                if path.startswith(PHOTO_DIR) and os.path.exists(path):
-                    os.remove(path)
+                # url → 실제 파일 경로 (data/photos 아래만 허용). 목록용 사진도 함께 지운다
+                for u in filter(None, (target, item.get("thumb"))):
+                    rel = os.path.normpath(unquote(u).lstrip("/"))
+                    path = os.path.join(ROOT, rel)
+                    if path.startswith(PHOTO_DIR) and os.path.exists(path):
+                        os.remove(path)
         self.send_json({"ok": True})
 
     def log_message(self, fmt, *args):

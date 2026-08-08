@@ -73,19 +73,12 @@ def resolve_festivals():
             raw = json.load(f)
     except FileNotFoundError:
         return []
-    out, problems = [], []
+    out = []
     for country in ("kr", "jp"):
         for fes in raw.get(country, []):
-            cands = name_to_codes.get(fes["region"], [])
-            if len(cands) > 1 and fes.get("prov"):
-                cands = [c for c in cands if prov_short.get(c[:2]) == fes["prov"]]
-            if len(cands) != 1:
-                problems.append(f'{fes["name"]}: "{fes["region"]}" -> {cands or "없음"}')
-                continue
-            out.append({"n": fes["name"], "c": cands[0], "m": fes["months"],
+            code = resolve_region(fes, f'축제 {fes["name"]}')
+            out.append({"n": fes["name"], "c": code, "m": fes["months"],
                         "t": fes["tag"], "d": fes["desc"]})
-    if problems:
-        raise SystemExit("축제 지역을 지도 코드로 못 찾음:\n  " + "\n  ".join(problems))
     return out
 
 

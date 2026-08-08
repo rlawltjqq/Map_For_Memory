@@ -1,0 +1,371 @@
+{
+ "화천 산천어축제": {
+  "region": "화천군",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "인제 빙어축제": {
+  "region": "인제군",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "태백산 눈축제": {
+  "region": "태백시",
+  "lang": "ko",
+  "page": "태백산 눈축제",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/4/49/%ED%83%9C%EB%B0%B1%EC%82%B0%EB%88%88%EC%B6%95%EC%A0%9C2019%28AMJ%29.jpg?utm_source=ko.wikipedia.org&utm_campaign=api&utm_content=original",
+  "file": "태백산눈축제2019(AMJ).jpg",
+  "author": "칼빈500",
+  "license": "CC BY-SA 3.0"
+ },
+ "영덕 대게축제": {
+  "region": "영덕군",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "울진 대게와 붉은대게축제": {
+  "region": "울진군",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "광양 매화축제": {
+  "region": "광양시",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "구례 산수유꽃축제": {
+  "region": "구례군",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "제주 들불축제": {
+  "region": "제주시",
+  "lang": "ko",
+  "page": "제주들불축제",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/0/08/%EC%A0%9C%EC%A3%BC%EB%93%A4%EB%B6%88%EC%B6%95%EC%A0%9C.png?utm_source=ko.wikipedia.org&utm_campaign=api&utm_content=original",
+  "file": "제주들불축제.png",
+  "author": "한국관광공사",
+  "license": "CC BY-SA 4.0"
+ },
+ "청도 소싸움축제": {
+  "region": "청도군",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "통영 국제음악제": {
+  "region": "통영시",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "진해 군항제": {
+  "region": "창원시",
+  "lang": "ko",
+  "page": "진해군항제",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/4/44/2016_Jinhae_Naval_Port_Festival_040.JPG?utm_source=ko.wikipedia.org&utm_campaign=api&utm_content=original",
+  "file": "2016_Jinhae_Naval_Port_Festival_040.JPG",
+  "author": "hyolee2",
+  "license": "CC BY-SA 4.0"
+ },
+ "태안 세계튤립축제": {
+  "region": "태안군",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "고창 청보리밭축제": {
+  "region": "고창군",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "함평 나비대축제": {
+  "region": "함평군",
+  "lang": "ko",
+  "page": "함평나비대축제",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/b/b8/Hampyeong_butterfly_festival_033.JPG?utm_source=ko.wikipedia.org&utm_campaign=api&utm_content=original",
+  "file": "Hampyeong_butterfly_festival_033.JPG",
+  "author": "myself (User:Piotrus)",
+  "license": "CC BY-SA 3.0"
+ },
+ "담양 대나무축제": {
+  "region": "담양군",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "보성 다향대축제": {
+  "region": "보성군",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "남원 춘향제": {
+  "region": "남원시",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "춘천 마임축제": {
+  "region": "춘천시",
+  "lang": "ko",
+  "page": "춘천마임축제",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/0/0a/%EC%B6%98%EC%B2%9C%EB%A7%88%EC%9E%84%EC%B6%95%EC%A0%9C.jpg?utm_source=ko.wikipedia.org&utm_campaign=api&utm_content=original",
+  "file": "춘천마임축제.jpg",
+  "author": "춘천마임축제",
+  "license": "Public domain"
+ },
+ "하동 야생차문화축제": {
+  "region": "하동군",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "여수 거북선축제": {
+  "region": "여수시",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "강릉 단오제": {
+  "region": "강릉시",
+  "lang": "ko",
+  "page": "강릉 단오제",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/a/ac/Korea_Gangneung_Danoje_Jangneung_49_%2814140137998%29.jpg?utm_source=ko.wikipedia.org&utm_campaign=api&utm_content=original",
+  "file": "Korea_Gangneung_Danoje_Jangneung_49_(14140137998).jpg",
+  "author": "Korea.net / Korean Culture and Information Service (Jeon Han)",
+  "license": "CC BY-SA 2.0"
+ },
+ "보령 머드축제": {
+  "region": "보령시",
+  "lang": "ko",
+  "page": "보령머드축제",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/3/3c/Mud_Fest_2008_%282679028799%29.jpg?utm_source=ko.wikipedia.org&utm_campaign=api&utm_content=original",
+  "file": "Mud_Fest_2008_(2679028799).jpg",
+  "author": "Hypnotica Studios Infinite from Toms River, New Jersey, USA",
+  "license": "CC BY 2.0"
+ },
+ "대구 치맥페스티벌": {
+  "region": "달서구",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "정남진 장흥 물축제": {
+  "region": "장흥군",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "봉화 은어축제": {
+  "region": "봉화군",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "평창 대관령음악제": {
+  "region": "평창군",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "강진 청자축제": {
+  "region": "강진군",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "부산 바다축제": {
+  "region": "해운대구",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "무주 반딧불축제": {
+  "region": "무주군",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "제천 국제음악영화제": {
+  "region": "제천시",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "안동 국제탈춤페스티벌": {
+  "region": "안동시",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "금산 인삼축제": {
+  "region": "금산군",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "산청 한방약초축제": {
+  "region": "산청군",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "김제 지평선축제": {
+  "region": "김제시",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "안성 바우덕이축제": {
+  "region": "안성시",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "영동 난계국악축제": {
+  "region": "영동군",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "진주 남강유등축제": {
+  "region": "진주시",
+  "lang": "ko",
+  "page": "진주남강유등축제",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/d/d8/Jinju_namgang_lantern_festival.jpg?utm_source=ko.wikipedia.org&utm_campaign=api&utm_content=original",
+  "file": "Jinju_namgang_lantern_festival.jpg",
+  "author": "Asfreeas at Korean Wikipedia\n\n This photo was taken with Nikon D80",
+  "license": "CC BY 3.0"
+ },
+ "부산국제영화제": {
+  "region": "해운대구",
+  "lang": "ko",
+  "page": "부산국제영화제",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/8/88/Biff_logo.jpg?utm_source=ko.wikipedia.org&utm_campaign=api&utm_content=original",
+  "file": "Biff_logo.jpg",
+  "author": "biffThe logo is from the BIFF Official Website website. www.biff.kr",
+  "license": "Public domain"
+ },
+ "서울세계불꽃축제": {
+  "region": "영등포구",
+  "lang": "ko",
+  "page": "서울세계불꽃축제",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/c/ce/2011%EB%85%84_11%EC%9B%94_16%EC%9D%BC_%EC%84%9C%EC%9A%B8%EC%84%B8%EA%B3%84%EB%B6%88%EA%BD%83%EC%B6%95%EC%A0%9C%28Seoul_international_fireworks_festival%29_000001.JPG?utm_source=ko.wikipedia.org&utm_campaign=api&utm_content=original",
+  "file": "2011년_11월_16일_서울세계불꽃축제(Seoul_international_fireworks_festival)_000001.JPG",
+  "author": "서울특별시 소방재난본부(Seoul Metropolitan Fire &amp; Disaster Headquarters)",
+  "license": "CC BY-SA 4.0"
+ },
+ "이천 쌀문화축제": {
+  "region": "이천시",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "자라섬 재즈페스티벌": {
+  "region": "가평군",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "논산 강경젓갈축제": {
+  "region": "논산시",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "서산 해미읍성축제": {
+  "region": "서산시",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "순천만 갈대축제": {
+  "region": "순천시",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "광주 세계김치축제": {
+  "region": "남구",
+  "lang": "ko",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "서울 빛초롱축제": {
+  "region": "종로구",
+  "lang": "ko",
+  "page": "서울빛초롱축제",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/6/6b/2._%2825%EB%B9%9B%EC%B4%88%EB%A1%B1%EC%B6%95%EC%A0%9C%29_KV_%EC%B2%AD%EA%B3%84%EC%B2%9C%2C%EC%9A%B0%EC%9D%B4%EC%B2%9C_420_594mm_%EC%9C%88%ED%84%B0%ED%8E%98%EC%8A%A4%ED%83%80_%EB%B0%98%EC%98%81.jpg?utm_source=ko.wikipedia.org&utm_campaign=api&utm_content=original",
+  "file": "2._(25빛초롱축제)_KV_청계천,우이천_420_594mm_윈터페스타_반영.jpg",
+  "author": "Seoul Lantern Festival",
+  "license": "CC0"
+ },
+ "나라 와카쿠사야마 야키": {
+  "region": "나라현",
+  "lang": "ja",
+  "page": null,
+  "url": null,
+  "file": null
+ },
+ "삿포로 눈축제": {
+  "region": "홋카이도",
+  "lang": "ja",
+  "page": "さっぽろ雪まつり",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/4/4a/Odori_Park_Sapporo_Snow_Festival_2007.JPG?utm_source=ja.wikipedia.org&utm_campaign=api&utm_content=original",
+  "file": "Odori_Park_Sapporo_Snow_Festival_2007.JPG",
+  "author": "Eckhard Pecher",
+  "license": "CC BY 2.5"
+ },
+ "나가사키 랜턴 페스티벌": {
+  "region": "나가사키현",
+  "lang": "ja",
+  "page": "長崎ランタンフェスティバル",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/3/39/Nagasaki_Lantern_Festival_-_01.jpg?utm_source=ja.wikipedia.org&utm_campaign=api&utm_content=original",
+  "file": "Nagasaki_Lantern_Festival_-_01.jpg",
+  "author": "JKT-c",
+  "license": "CC BY 3.0"
+ }
+}

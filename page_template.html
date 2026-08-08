@@ -470,6 +470,9 @@
     body.tab-stats aside {
       display: block; width: 100%; max-height: none; flex: 1; border-left: none;
     }
+    /* 모바일에서는 추천과 기록이 서로 다른 화면 — 한쪽만 보인다 */
+    body.tab-rec #feedSection { display: none; }
+    body.tab-stats:not(.tab-rec) #recSection { display: none; }
     .big-stat .pct { font-size: 34px; }
     #tabbar { display: flex; background: #fff; border-top: 1px solid #e5e7eb; flex-shrink: 0; }
     #tabbar button {
@@ -584,18 +587,21 @@
         </div>
       </div>
 
+      <div id="recSection">
+        <h2 id="recHead">가볼 만한 곳
+          <select id="recMonth"></select>
+        </h2>
+        <div id="recNote"></div>
+        <div id="recList"></div>
+
+        <h3 id="fesHead">이달의 축제</h3>
+        <div id="fesNote"></div>
+        <div id="fesList"></div>
+      </div>
+
+      <div id="feedSection">
       <h2 id="statsCardHead">여행 통계</h2>
       <div id="statsCards"></div>
-
-      <h2 id="recHead">가볼 만한 곳
-        <select id="recMonth"></select>
-      </h2>
-      <div id="recNote"></div>
-      <div id="recList"></div>
-
-      <h3 id="fesHead">이달의 축제</h3>
-      <div id="fesNote"></div>
-      <div id="fesList"></div>
 
       <h2 id="feedHead">여행 앨범</h2>
       <div id="feedFilter">
@@ -613,6 +619,7 @@
         <input id="restoreFile" type="file" accept="application/json,.json" hidden>
         <button id="resetBtn">방문 표시 초기화</button>
         <button id="deleteMapBtn">지도 삭제</button>
+      </div>
       </div>
     </aside>
   </div>
@@ -1176,13 +1183,15 @@ function layoutMode() {
 function setTab(t) {
   // 추천과 기록은 같은 화면(사이드) 안에 있고, 어디로 스크롤할지만 다르다
   document.body.classList.toggle("tab-stats", t !== "map");
+  document.body.classList.toggle("tab-rec", t === "rec");
   $("tabMap").classList.toggle("active", t === "map");
   $("tabStats").classList.toggle("active", t === "stats");
   $("tabRec").classList.toggle("active", t === "rec");
   if (t === "map") { updateLabels(); return; }   // 숨겨져 있던 동안 크기가 0이었으므로 다시 계산
-  // 누른 탭의 내용이 바로 보이도록 그 섹션으로 스크롤 (모바일에서는 화면 아래에 있다)
+  // 모바일은 추천/기록이 서로 다른 화면이라 위에서부터 보여주면 된다.
+  // 데스크톱은 한 화면에 다 있으므로 해당 섹션으로 스크롤한다.
   const head = t === "rec" ? $("recHead") : $("feedHead");
-  asideEl.scrollTo({ top: Math.max(0, head.offsetTop - 8), behavior: "smooth" });
+  asideEl.scrollTo({ top: mq.matches ? 0 : Math.max(0, head.offsetTop - 8), behavior: "smooth" });
 }
 $("tabMap").onclick = () => setTab("map");
 $("tabStats").onclick = () => setTab("stats");
@@ -1306,7 +1315,7 @@ function unassignedPhotos(code) {
 function photoGridHtml(list) {
   if (!list.length) return "";
   return `<div class="v-photos">${list.map(p =>
-    `<div class="ph"><img src="${p.url}" alt="${escapeHtml(p.name || "")}" loading="lazy" data-full="${p.url}">` +
+    `<div class="ph"><img src="${thumbOf(p)}" alt="${escapeHtml(p.name || "")}" loading="lazy" decoding="async" data-full="${p.url}">` +
     `<button class="del" data-url="${p.url}" title="삭제">✕</button>` +
     `<button class="mv" data-url="${p.url}" title="다른 방문으로 옮기기">이동</button></div>`).join("")}</div>`;
 }
@@ -1534,6 +1543,10 @@ let recMonth = new Date().getMonth();      // 0-11
 // 자료 없는 지역이 부당하게 밀리는 것을 막기 위함.
 // (지역 분산은 점수가 아니라 시·도당 노출 개수 제한으로 처리한다)
 const REC_WEIGHTS = { weather: 0.35, season: 0.25, popular: 0.20, taste: 0.10 };
+const festivalsByCode = FESTIVALS.reduce((byCode, festival) => {
+  (byCode[festival.c] ||= []).push(festival);
+  return byCode;
+}, {});
 
 // 여행하기 좋은 날씨 점수 — 기온이 18도에 가까울수록, 비가 적을수록 높다
 function climateScore(t, p) {
@@ -1545,7 +1558,7 @@ function climateScore(t, p) {
 
 // 그 달에 축제가 있으면 높게. 없다고 0점은 아니라서 기본값을 둔다.
 function seasonScore(code, month) {
-  const fs = FESTIVALS.filter(f => f.c === code);
+  const fs = festivalsByCode[code] || [];
   if (!fs.length) return 30;
   if (fs.some(f => f.m.includes(month))) return 100;
   const near = (month % 12) + 1, prev = ((month + 10) % 12) + 1;
@@ -1590,13 +1603,8 @@ function climateWhy(t, p) {
   const wet = p >= 200 ? "비가 많아요" : p >= 110 ? "비가 잦은 편" : p >= 55 ? "비는 보통" : "비가 적어요";
   return `${heat} ${wet}`;
 }
-function renderRecs() {
-  const list = $("recList"), note = $("recNote"), sel = $("recMonth");
-  if (!list) return;
-  if (!sel.options.length) {
-    sel.innerHTML = Array.from({ length: 12 }, (_, i) => `<option value="${i}">${i + 1}월</option>`).join("");
-    sel.value = recMonth;
-  }
+
+function buildRecommendationRows() {
   const rows = [];
   let unvisited = 0, haveData = 0;
   const tp = tasteProfile();
@@ -1605,7 +1613,7 @@ function renderRecs() {
     if (countryOfCode(code) !== COUNTRY) return;
     const c = CLIMATE[code];
     if (c && c[recMonth]) haveData++;
-    if (visited.has(code)) return;                 // 이미 다녀온 곳은 빼고
+    if (visited.has(code)) return;
     unvisited++;
     if (!c || !c[recMonth]) return;
     const [t, p] = c[recMonth];
@@ -1615,20 +1623,58 @@ function renderRecs() {
     const parts = {
       weather,
       season: seasonScore(code, month),
-      popular: hot ? hot.s : null,                 // 자료 없으면 비중째 제외
+      popular: hot ? hot.s : null,
       taste: tasteScore(code, tp),
     };
     rows.push({ code, t, p, parts, hot, s: recScore(parts) });
   });
   rows.sort((a, b) => b.s - a.s || a.code.localeCompare(b.code));
-  // 같은 시·도가 몰리면 목록이 단조로워진다 (대구 자치구만 4개 같은 식). 시·도당 2곳까지.
+  return { rows, unvisited, haveData, month };
+}
+
+function takeDiverseRecommendations(rows, limit = 12) {
   const perProv = {}, top = [];
-  for (const r of rows) {
-    const g = groupOf(r.code);
-    if ((perProv[g] = (perProv[g] || 0) + 1) > 2) continue;
-    top.push(r);
-    if (top.length === 12) break;
+  for (const row of rows) {
+    const group = groupOf(row.code);
+    if ((perProv[group] = (perProv[group] || 0) + 1) > 2) continue;
+    top.push(row);
+    if (top.length === limit) break;
   }
+  return top;
+}
+
+function recommendationReasons(row, month) {
+  const why = [];
+  if (row.parts.weather >= 70) why.push(`${month}월 날씨 좋음`);
+  if (row.parts.season >= 100) why.push("이달 축제");
+  else if (row.parts.season >= 55) why.push("축제 시즌 근접");
+  if (row.hot) why.push(escapeHtml(row.hot.t));
+  if (row.parts.taste != null && row.parts.taste >= 70) why.push("취향과 비슷");
+  return why.length ? why : [climateWhy(row.t, row.p)];
+}
+
+function recommendationCard(row, month) {
+  const emblem = EMBLEMS[row.code];
+  return `<div class="rec-card" data-code="${row.code}">
+    ${emblem ? `<img src="${emblem}" alt="" loading="lazy">` : ""}
+    <div class="rec-main">
+      <div class="rec-name">${escapeHtml(nameByCode[row.code])}</div>
+      <div class="rec-why">${PROV[groupOf(row.code)] || ""} · ${recommendationReasons(row, month).join(" · ")}</div>
+    </div>
+    <div class="rec-num"><b>${row.t}°</b>${row.p}mm</div>
+  </div>`;
+}
+
+function renderRecs() {
+  const list = $("recList"), note = $("recNote"), sel = $("recMonth");
+  if (!list) return;
+  if (!sel.options.length) {
+    sel.innerHTML = Array.from({ length: 12 }, (_, i) => `<option value="${i}">${i + 1}월</option>`).join("");
+    sel.value = recMonth;
+  }
+  // 같은 시·도가 몰리면 목록이 단조로워진다 (대구 자치구만 4개 같은 식). 시·도당 2곳까지.
+  const { rows, unvisited, haveData, month } = buildRecommendationRows();
+  const top = takeDiverseRecommendations(rows);
   const cName = COUNTRY === "jp" ? "일본" : "한국";
   // 결과가 없는 이유를 구분해서 알린다 (다 가본 것과 날씨 자료가 없는 것은 다르다)
   const at = TRENDING_AT ? `인기도는 ${TRENDING_AT} 기준 편집 자료입니다.` : "";
@@ -1637,26 +1683,7 @@ function renderRecs() {
     : !haveData ? `${cName}은 아직 날씨 자료가 없습니다.`
     : !unvisited ? `${cName}은 이미 다 다녀오셨네요.`
     : `추천할 곳을 찾지 못했습니다.`;
-  list.innerHTML = top.map(r => {
-    const em = EMBLEMS[r.code];
-    // 왜 추천됐는지 근거를 짚어준다 (점수에 크게 기여한 항목 순)
-    const why = [];
-    if (r.parts.weather >= 70) why.push(`${month}월 날씨 좋음`);
-    if (r.parts.season >= 100) why.push("이달 축제");
-    else if (r.parts.season >= 55) why.push("축제 시즌 근접");
-    if (r.hot) why.push(escapeHtml(r.hot.t));
-    // 뚜렷한 쏠림일 때만 붙인다 (기준이 낮으면 3분의 1에 붙어 의미가 없어진다)
-    if (r.parts.taste != null && r.parts.taste >= 70) why.push("취향과 비슷");
-    if (!why.length) why.push(climateWhy(r.t, r.p));
-    return `<div class="rec-card" data-code="${r.code}">
-      ${em ? `<img src="${em}" alt="" loading="lazy">` : ""}
-      <div class="rec-main">
-        <div class="rec-name">${escapeHtml(nameByCode[r.code])}</div>
-        <div class="rec-why">${PROV[groupOf(r.code)] || ""} · ${why.join(" · ")}</div>
-      </div>
-      <div class="rec-num"><b>${r.t}°</b>${r.p}mm</div>
-    </div>`;
-  }).join("");
+  list.innerHTML = top.map(row => recommendationCard(row, month)).join("");
   list.querySelectorAll(".rec-card").forEach(el => {
     el.onclick = () => { setTab("map"); focusRegion(el.dataset.code); };
   });
@@ -1768,7 +1795,7 @@ function renderFeed() {
         ${v.memo ? `<span class="mem-vmemo">${escapeHtml(v.memo)}</span>` : ""}
       </div>` + (vp.length
         ? `<div class="mem-photos">${vp.map(p =>
-            `<img src="${p.url}" loading="lazy" data-full="${p.url}">`).join("")}</div>`
+            `<img src="${thumbOf(p)}" loading="lazy" decoding="async" data-full="${p.url}">`).join("")}</div>`
         : "");
     }).join("");
     // 방문에 속하지 않은 사진은 맨 아래
@@ -1776,7 +1803,7 @@ function renderFeed() {
     const rest = e.photos.filter(p => !p.vid || !vids.has(p.vid));
     const photosHtml = rest.length
       ? `<div class="mem-photos">${rest.map(p =>
-          `<img src="${p.url}" loading="lazy" data-full="${p.url}">`).join("")}</div>`
+          `<img src="${thumbOf(p)}" loading="lazy" decoding="async" data-full="${p.url}">`).join("")}</div>`
       : "";
     return `<div class="mem-card" data-code="${e.code}">
       <div class="mem-head">
@@ -1822,21 +1849,23 @@ function dismissFirstHint() {
 }
 
 // 사진 압축: 긴 변 1600px, JPEG 품질 0.85 (Vercel 요청 크기 제한 대응 + 저장 용량 절약)
-async function compressImage(file) {
+async function compressImage(file, max = 1600, quality = 0.85) {
   if (!/^image\//.test(file.type)) return { blob: file, name: file.name };
   const img = await createImageBitmap(file).catch(() => null);
   if (!img) return { blob: file, name: file.name };
-  const max = 1600;
   const k = Math.min(1, max / Math.max(img.width, img.height));
-  if (k === 1 && file.size < 2 * 1024 * 1024) return { blob: file, name: file.name };
+  if (k === 1 && file.size < 2 * 1024 * 1024 && max >= 1600) return { blob: file, name: file.name };
   const c = document.createElement("canvas");
   c.width = Math.round(img.width * k);
   c.height = Math.round(img.height * k);
   c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
-  const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
+  const blob = await new Promise(r => c.toBlob(r, "image/jpeg", quality));
   if (!blob) return { blob: file, name: file.name };
   return { blob, name: file.name.replace(/\.\w+$/, "") + ".jpg" };
 }
+// 목록에 쓸 작은 사진. 앨범 칸은 60px 남짓인데 원본(1600px)을 내려받으면
+// 사진 한 장에 수백 KB가 들어 모바일에서 한참 걸린다.
+const thumbOf = p => p.thumb || p.url;
 $("photoInput").addEventListener("change", async e => {
   if (!selected) { e.target.value = ""; return; }
   const code = selected, vid = pendingVid;
@@ -1852,7 +1881,18 @@ $("photoInput").addEventListener("change", async e => {
         headers: { "Content-Type": "application/octet-stream", "X-Filename": encodeURIComponent(name) },
         body: blob
       });
-      (photos[code] = photos[code] || []).push({ url: j.url, name: j.name, vid: j.vid || vid });
+      const entry = { url: j.url, name: j.name, vid: j.vid || vid };
+      (photos[code] = photos[code] || []).push(entry);
+      // 목록용 작은 사진은 실패해도 원본으로 대체되므로 조용히 넘어간다
+      try {
+        const t = await compressImage(files[i], 400, 0.7);
+        const r = await api(`/api/photo?room=${ROOM}&code=${code}&thumbfor=${encodeURIComponent(j.url)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/octet-stream", "X-Filename": encodeURIComponent(t.name) },
+          body: t.blob
+        });
+        entry.thumb = r.thumb;
+      } catch {}
     } catch { alert(`${files[i].name} 업로드 실패`); }
   }
   $("uploadMsg").textContent = "";
@@ -2464,8 +2504,8 @@ async function restoreBackup(data) {
       if (!p || !p.url || photos[code].some(x => x.url === p.url)) continue;
       await api(`/api/photo?room=${ROOM}&code=${code}&link=1`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: p.url, name: p.name || "", vid: p.vid || "" }) });
-      photos[code].push({ url: p.url, name: p.name || "", vid: p.vid || "" });
+        body: JSON.stringify({ url: p.url, name: p.name || "", vid: p.vid || "", thumb: p.thumb || "" }) });
+      photos[code].push({ url: p.url, name: p.name || "", vid: p.vid || "", thumb: p.thumb || "" });
     }
     if (!photos[code].length) delete photos[code];
   }

@@ -34,14 +34,20 @@ python server.py
 | `page_template.html` | 프론트엔드 템플릿 (수정은 여기서) |
 | `make_sigungu_map.py` | GeoJSON → 지도 SVG 생성 (경계 + 지역명 라벨) |
 | `build_page.py` | 템플릿 + SVG → index.html 빌드 |
+| `climate.json` / `festivals.json` / `trending.json` | 추천 점수에 쓰는 기후·계절·큐레이션 데이터 |
 
 ### API
 
 - `POST /api/rooms` `{name, password}` → 방 생성, `{id, token}` 반환
+- `DELETE /api/rooms` `{room, password}` (x-token 헤더) → 지도와 이 지도 소유 사진 삭제
 - `POST /api/join` `{room, password}` → `{token}` 반환
-- `GET /api/state?room=` (x-token 헤더) → `{name, visited, photos}`
-- `POST /api/visited` `{room, code, on}` 개별 토글 / `{room, codes:[...]}` 전체 교체
-- `POST /api/photo?room=&code=` (바이너리 body + X-Filename 헤더) / `DELETE` `{url}`
+- `GET /api/state?room=` (x-token 헤더) → `{name, visited, photos, notes}`
+- `POST /api/visited` `{room, code, on}` → 방문 표시 개별 토글
+- `POST /api/note` `{room, code, visits}` → 지역별 방문일·메모 저장
+- `POST /api/photo?room=&code=` (바이너리 body + X-Filename 헤더) → 사진 업로드
+- `PUT /api/photo?room=&code=&vid=` `{url}` → 사진을 다른 방문 기록으로 이동
+- `DELETE /api/photo?room=&code=` `{url}` → 사진 삭제
+- `POST /api/reset` `{room, password, country}` → 해당 국가의 방문 표시 초기화
 
 인증: 방 암호는 scrypt 해시로 저장, 토큰 = sha256(방ID:암호해시).
 클라이언트가 업로드 전에 사진을 긴 변 1600px JPEG로 압축한다 (Vercel 요청 4.5MB 제한 대응).
@@ -56,3 +62,6 @@ curl -L -o korea_municipalities.geojson https://raw.githubusercontent.com/southk
 python make_sigungu_map.py   # SVG 재생성
 python build_page.py         # index.html 재빌드
 ```
+
+`index.html`은 생성물입니다. 템플릿이나 추천 데이터를 수정한 뒤에는 `python build_page.py`를 실행하고,
+`git diff -- index.html`로 생성 결과를 검토하세요.

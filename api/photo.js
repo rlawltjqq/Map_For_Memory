@@ -31,6 +31,7 @@ export default async function handler(req, res) {
           url: b.url,
           name: String(b.name || "photo.jpg").replace(/[^\w.\-가-힣 ]/g, "_").slice(-80),
           vid: typeof b.vid === "string" && /^[\w-]{1,40}$/.test(b.vid) ? b.vid : "",
+          ...(isOwnPhotoUrl(b.thumb) ? { thumb: b.thumb } : {}),
         });
         await redis.hset(key, { [code]: list });
       }
@@ -41,6 +42,22 @@ export default async function handler(req, res) {
     const body = req.body;
     if (!body || !body.length) return res.status(400).json({ error: "empty body" });
     if (body.length > 8 * 1024 * 1024) return res.status(400).json({ error: "too large" });
+
+    // 목록용 작은 사진 — 원본은 1600px라 58px 칸에 쓰면 낭비가 크다.
+    // 원본을 올린 뒤 그 주소를 thumbfor로 넘겨 같은 항목에 붙인다.
+    const thumbFor = req.query.thumbfor;
+    if (thumbFor) {
+      if (!isOwnPhotoUrl(thumbFor)) return res.status(400).json({ error: "bad url" });
+      const list = (await redis.hget(key, code)) || [];
+      const idx = list.findIndex((p) => p.url === thumbFor);
+      if (idx < 0) return res.status(404).json({ error: "not found" });
+      const tb = await put(`rooms/${room}/${code}/t_${Date.now()}_${name}`, body, {
+        access: "public",
+      });
+      list[idx] = { ...list[idx], thumb: tb.url };
+      await redis.hset(key, { [code]: list });
+      return res.json({ ok: true, thumb: tb.url });
+    }
     const blob = await put(`rooms/${room}/${code}/${Date.now()}_${name}`, body, {
       access: "public",
     });
@@ -78,8 +95,10 @@ export default async function handler(req, res) {
   if (req.method === "DELETE") {
     const { url } = req.body || {};
     const list = (await redis.hget(key, code)) || [];
-    if (list.some((p) => p.url === url)) {
+    const gone = list.find((p) => p.url === url);
+    if (gone) {
       await del(url).catch(() => {});
+      if (gone.thumb) await del(gone.thumb).catch(() => {});   // 목록용 사진도 함께
       const rest = list.filter((p) => p.url !== url);
       if (rest.length) await redis.hset(key, { [code]: rest });
       else await redis.hdel(key, code);
