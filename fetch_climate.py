@@ -84,7 +84,7 @@ def main():
                 # 429(요청 제한)는 시간당 한도라 넉넉히 쉬어야 풀린다
                 limited = "429" in str(e)
                 wait = (90 if limited else 10) * (attempt + 1)
-                print(f"  재시도 {attempt + 1}/8 ({e}) — {wait}초 대기", file=sys.stderr)
+                print(f"  재시도 {attempt + 1}/8 ({e}): {wait}초 대기", file=sys.stderr)
                 time.sleep(wait)
         else:
             print(f"  실패: {[c for c, _, _ in batch]}", file=sys.stderr)
@@ -92,7 +92,7 @@ def main():
             json.dump(result, f)
         print(f"  {min(i + BATCH, len(todo))}/{len(todo)}")
         time.sleep(6)
-    print(f"climate.json 저장 완료 — {len(result)}곳")
+    print(f"climate.json 저장 완료: {len(result)}곳")
 
 
 if __name__ == "__main__":
