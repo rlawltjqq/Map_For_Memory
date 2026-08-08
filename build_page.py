@@ -59,6 +59,48 @@ map_codes = set(re.findall(r'data-code="(\d+)"', svg + svg_jp))
 dropped = len(emblems) - len(map_codes & set(emblems))
 emblems = {c: u for c, u in emblems.items() if c in map_codes}
 
+# ---- 축제: 지역 이름 -> 지도 코드로 변환 ----
+# 이름은 사람이 쓰기 편하지만 코드가 있어야 지도와 연결된다. 같은 이름(중구·남구 등)이
+# 여러 시도에 있으므로 prov로 구분하고, 하나로 좁혀지지 않으면 빌드를 멈춘다.
+name_to_codes = {}
+for m in re.finditer(r'data-name="([^"]+)" data-code="(\d+)"', svg + svg_jp):
+    name_to_codes.setdefault(m.group(1), []).append(m.group(2))
+
+
+def resolve_festivals():
+    try:
+        with open("festivals.json", encoding="utf-8") as f:
+            raw = json.load(f)
+    except FileNotFoundError:
+        return []
+    out, problems = [], []
+    for country in ("kr", "jp"):
+        for fes in raw.get(country, []):
+            cands = name_to_codes.get(fes["region"], [])
+            if len(cands) > 1 and fes.get("prov"):
+                cands = [c for c in cands if prov_short.get(c[:2]) == fes["prov"]]
+            if len(cands) != 1:
+                problems.append(f'{fes["name"]}: "{fes["region"]}" -> {cands or "없음"}')
+                continue
+            out.append({"n": fes["name"], "c": cands[0], "m": fes["months"],
+                        "t": fes["tag"], "d": fes["desc"]})
+    if problems:
+        raise SystemExit("축제 지역을 지도 코드로 못 찾음:\n  " + "\n  ".join(problems))
+    return out
+
+
+festivals = resolve_festivals()
+
+try:
+    with open("climate.json", encoding="utf-8") as f:
+        climate = json.load(f)
+except FileNotFoundError:
+    climate = {}
+# 지도에 없는 코드는 빼고, 소수점도 줄여 용량을 아낀다
+climate = {c: v for c, v in climate.items() if c in map_codes}
+
+html = html.replace("__CLIMATE__", json.dumps(climate, separators=(",", ":")))
+html = html.replace("__FESTIVALS__", json.dumps(festivals, ensure_ascii=False, separators=(",", ":")))
 html = html.replace("__PROV__", json.dumps(prov_short, ensure_ascii=False))
 html = html.replace("__PROV_JP__", json.dumps(jp_meta["regions"], ensure_ascii=False))
 html = html.replace("__EMBLEMS__", json.dumps(emblems, ensure_ascii=False))

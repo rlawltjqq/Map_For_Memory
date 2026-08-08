@@ -267,6 +267,43 @@
   .add-visit:hover { background: #f1f7f3; border-color: #3b9c6e; color: #2d6a4f; }
   #visitList:empty + .add-visit { border-color: #9ca3af; }
   /* 여행 통계 카드 */
+  /* 가볼 만한 곳 추천 */
+  #recHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  #recMonth {
+    font-size: 12px; font-weight: 400; padding: 4px 6px; border: 1px solid #e5e7eb;
+    border-radius: 7px; background: #fff; color: #4b5563;
+  }
+  #recNote { font-size: 11.5px; color: #9ca3af; margin-bottom: 8px; line-height: 1.5; }
+  #recList { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
+  .rec-card {
+    display: flex; align-items: center; gap: 9px; padding: 9px 11px; background: #fff;
+    border: 1px solid #eef1f4; border-radius: 11px; cursor: pointer; text-align: left;
+  }
+  .rec-card:hover { border-color: #cfe3d8; background: #fbfdfc; }
+  .rec-card img { width: 26px; height: 26px; object-fit: contain; flex: none; }
+  .rec-main { flex: 1; min-width: 0; }
+  .rec-name { font-size: 13.5px; font-weight: 600; color: #1f2937; }
+  .rec-why { font-size: 11.5px; color: #6b7280; margin-top: 1px; }
+  .rec-num { flex: none; text-align: right; font-size: 11.5px; color: #6b7280; line-height: 1.45; }
+  .rec-num b { display: block; font-size: 14px; color: #2d6a4f; font-weight: 700; }
+  /* 이달의 축제 */
+  #fesHead { font-size: 13.5px; font-weight: 700; color: #374151; margin: 4px 0 3px; }
+  #fesNote { font-size: 11.5px; color: #9ca3af; margin-bottom: 8px; line-height: 1.5; }
+  #fesList { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
+  .fes-card {
+    display: flex; align-items: center; gap: 9px; padding: 9px 11px; background: #fff;
+    border: 1px solid #eef1f4; border-radius: 11px; cursor: pointer; text-align: left;
+  }
+  .fes-card:hover { border-color: #cfe3d8; background: #fbfdfc; }
+  .fes-tag {
+    flex: none; font-size: 10.5px; font-weight: 600; color: #2d6a4f; background: #eaf5ef;
+    border-radius: 6px; padding: 3px 6px; min-width: 38px; text-align: center;
+  }
+  .fes-main { flex: 1; min-width: 0; }
+  .fes-name { font-size: 13px; font-weight: 600; color: #1f2937; }
+  .fes-sub { font-size: 11.5px; color: #6b7280; margin-top: 1px; }
+  .fes-when { flex: none; font-size: 11px; color: #9ca3af; }
+  .fes-card.done .fes-name::after { content: " · 다녀옴"; color: #2d6a4f; font-weight: 500; font-size: 11px; }
   #feedFilter { display: flex; gap: 6px; margin-bottom: 10px; }
   #feedSearch {
     flex: 1; min-width: 0; padding: 8px 11px; font-size: 13px; border: 1px solid #e5e7eb;
@@ -550,6 +587,16 @@
       <h2 id="statsCardHead">여행 통계</h2>
       <div id="statsCards"></div>
 
+      <h2 id="recHead">가볼 만한 곳
+        <select id="recMonth"></select>
+      </h2>
+      <div id="recNote"></div>
+      <div id="recList"></div>
+
+      <h3 id="fesHead">이달의 축제</h3>
+      <div id="fesNote"></div>
+      <div id="fesList"></div>
+
       <h2 id="feedHead">여행 앨범</h2>
       <div id="feedFilter">
         <input id="feedSearch" type="search" placeholder="지역명·메모 검색" autocomplete="off">
@@ -571,6 +618,7 @@
   </div>
   <nav id="tabbar">
     <button id="tabMap" class="active"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6 9 4Z"/><path d="M9 4v14"/><path d="M15 6v14"/></svg>지도</button>
+    <button id="tabRec"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 14.4 9l5.6.5-4.3 3.9 1.3 5.6L12 16l-5 3 1.3-5.6L4 9.5 9.6 9Z"/></svg>추천</button>
     <button id="tabStats"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 20v-7"/><path d="M12 20V6"/><path d="M19 20V9"/></svg>기록</button>
   </nav>
 </div>
@@ -630,6 +678,8 @@ const PROV_KR = __PROV__;
 const PROV_JP = __PROV_JP__;
 const PROV = Object.assign({}, PROV_KR, PROV_JP);   // 코드 앞 2자리 → 시·도 / 지방
 const EMBLEMS = __EMBLEMS__;   // 지역 코드 → 공식 휘장(심벌) 이미지 URL
+const CLIMATE = __CLIMATE__;   // 지역 코드 → [[월평균기온, 월강수량], x12]
+const FESTIVALS = __FESTIVALS__;   // 매년 열리는 대표 축제 [{n:이름, c:코드, m:[월], t:태그, d:설명}]
 const tooltip = document.getElementById("tooltip");
 const $ = id => document.getElementById(id);
 
@@ -1122,13 +1172,19 @@ function layoutMode() {
   }
 }
 function setTab(t) {
-  document.body.classList.toggle("tab-stats", t === "stats");
+  // 추천과 기록은 같은 화면(사이드) 안에 있고, 어디로 스크롤할지만 다르다
+  document.body.classList.toggle("tab-stats", t !== "map");
   $("tabMap").classList.toggle("active", t === "map");
   $("tabStats").classList.toggle("active", t === "stats");
-  if (t === "map") updateLabels();   // 숨겨져 있던 동안 크기가 0이었으므로 다시 계산
+  $("tabRec").classList.toggle("active", t === "rec");
+  if (t === "map") { updateLabels(); return; }   // 숨겨져 있던 동안 크기가 0이었으므로 다시 계산
+  // 누른 탭의 내용이 바로 보이도록 그 섹션으로 스크롤 (모바일에서는 화면 아래에 있다)
+  const head = t === "rec" ? $("recHead") : $("feedHead");
+  asideEl.scrollTo({ top: Math.max(0, head.offsetTop - 8), behavior: "smooth" });
 }
 $("tabMap").onclick = () => setTab("map");
 $("tabStats").onclick = () => setTab("stats");
+$("tabRec").onclick = () => setTab("rec");
 $("mapStatPill").onclick = () => setTab("stats");
 $("rpClose").onclick = () => {
   regionPanelEl.classList.remove("open");
@@ -1467,6 +1523,104 @@ function renderStatsCards() {
   $("statsCardHead").style.display = cards.length ? "" : "none";
 }
 
+// ---- 가볼 만한 곳 추천 ----
+// CLIMATE: 지역 코드 -> [[월평균기온, 월강수량], x12] (2020~2024 실측 평년값, 빌드 때 미리 받아둠)
+let recMonth = new Date().getMonth();      // 0-11
+
+// 여행하기 좋은 날씨 점수 — 기온이 18도에 가까울수록, 비가 적을수록 높다
+function climateScore(t, p) {
+  if (t == null || p == null) return null;
+  const warmth = Math.max(0, 100 - Math.abs(t - 18) * 6);
+  const dry = Math.max(0, 100 - Math.max(0, p - 60) * 0.35);
+  return Math.round(warmth * 0.65 + dry * 0.35);
+}
+function climateWhy(t, p) {
+  const heat = t >= 26 ? "덥지만" : t >= 20 ? "따뜻하고" : t >= 12 ? "선선하고" : t >= 4 ? "쌀쌀하고" : "춥지만";
+  const wet = p >= 200 ? "비가 많아요" : p >= 110 ? "비가 잦은 편" : p >= 55 ? "비는 보통" : "비가 적어요";
+  return `${heat} ${wet}`;
+}
+function renderRecs() {
+  const list = $("recList"), note = $("recNote"), sel = $("recMonth");
+  if (!list) return;
+  if (!sel.options.length) {
+    sel.innerHTML = Array.from({ length: 12 }, (_, i) => `<option value="${i}">${i + 1}월</option>`).join("");
+    sel.value = recMonth;
+  }
+  const rows = [];
+  let unvisited = 0, haveData = 0;
+  Object.keys(nameByCode).forEach(code => {
+    if (countryOfCode(code) !== COUNTRY) return;
+    const c = CLIMATE[code];
+    if (c && c[recMonth]) haveData++;
+    if (visited.has(code)) return;                 // 이미 다녀온 곳은 빼고
+    unvisited++;
+    if (!c || !c[recMonth]) return;
+    const [t, p] = c[recMonth];
+    const s = climateScore(t, p);
+    if (s == null) return;
+    rows.push({ code, t, p, s });
+  });
+  rows.sort((a, b) => b.s - a.s || a.code.localeCompare(b.code));
+  // 같은 시·도가 몰리면 목록이 단조로워진다 (대구 자치구만 4개 같은 식). 시·도당 2곳까지.
+  const perProv = {}, top = [];
+  for (const r of rows) {
+    const g = groupOf(r.code);
+    if ((perProv[g] = (perProv[g] || 0) + 1) > 2) continue;
+    top.push(r);
+    if (top.length === 12) break;
+  }
+  const cName = COUNTRY === "jp" ? "일본" : "한국";
+  // 결과가 없는 이유를 구분해서 알린다 (다 가본 것과 날씨 자료가 없는 것은 다르다)
+  note.textContent = rows.length
+    ? `${cName}에서 아직 안 가본 ${rows.length}곳 중, ${recMonth + 1}월 날씨가 좋은 순입니다.`
+    : !haveData ? `${cName}은 아직 날씨 자료가 없습니다.`
+    : !unvisited ? `${cName}은 이미 다 다녀오셨네요.`
+    : `추천할 곳을 찾지 못했습니다.`;
+  list.innerHTML = top.map(r => {
+    const em = EMBLEMS[r.code];
+    return `<div class="rec-card" data-code="${r.code}">
+      ${em ? `<img src="${em}" alt="" loading="lazy">` : ""}
+      <div class="rec-main">
+        <div class="rec-name">${escapeHtml(nameByCode[r.code])}</div>
+        <div class="rec-why">${PROV[groupOf(r.code)] || ""} · ${climateWhy(r.t, r.p)}</div>
+      </div>
+      <div class="rec-num"><b>${r.t}°</b>${r.p}mm</div>
+    </div>`;
+  }).join("");
+  list.querySelectorAll(".rec-card").forEach(el => {
+    el.onclick = () => { setTab("map"); focusRegion(el.dataset.code); };
+  });
+  renderFestivals();
+}
+
+// 이달의 축제 — 매년 반복되는 행사라 '달'로만 다룬다 (정확한 일정은 해마다 바뀜)
+function renderFestivals() {
+  const list = $("fesList"), note = $("fesNote"), head = $("fesHead");
+  if (!list) return;
+  const m = recMonth + 1;
+  const rows = FESTIVALS.filter(f => f.m.includes(m) && countryOfCode(f.c) === COUNTRY
+                                     && nameByCode[f.c]);
+  head.textContent = `${m}월의 축제`;
+  const cName = COUNTRY === "jp" ? "일본" : "한국";
+  note.textContent = rows.length
+    ? "해마다 열리는 대표 축제입니다. 정확한 일정은 해마다 달라지니 확인 후 방문하세요."
+    : `${m}월에 등록된 ${cName} 축제가 없습니다.`;
+  list.innerHTML = rows.map(f => {
+    const span = f.m.length > 1 ? `${f.m[0]}~${f.m[f.m.length - 1]}월` : `${f.m[0]}월`;
+    return `<div class="fes-card${visited.has(f.c) ? " done" : ""}" data-code="${f.c}">
+      <span class="fes-tag">${escapeHtml(f.t)}</span>
+      <div class="fes-main">
+        <div class="fes-name">${escapeHtml(f.n)}</div>
+        <div class="fes-sub">${escapeHtml(nameByCode[f.c])} · ${escapeHtml(f.d)}</div>
+      </div>
+      <span class="fes-when">${span}</span>
+    </div>`;
+  }).join("");
+  list.querySelectorAll(".fes-card").forEach(el => {
+    el.onclick = () => { setTab("map"); focusRegion(el.dataset.code); };
+  });
+}
+
 // 기록 검색·기간 필터 상태 (지도 상태가 아니라 화면 조건이라 서버에 저장하지 않는다)
 let feedQuery = "", feedYear = "";
 const visitYear = v => (v.start || v.end || "").slice(0, 4);
@@ -1492,6 +1646,7 @@ function syncYearOptions() {
 
 function renderFeed() {
   renderStatsCards();
+  renderRecs();
   const feed = $("memoryFeed");
   if (!feed) return;
   syncYearOptions();
@@ -2161,6 +2316,8 @@ MAPSVGS.forEach(el => el.addEventListener("pointermove", e => {
   if (pointers.size === 0) { el.classList.remove("dragging"); tapStart = null; }
   pinchDist = 0;
 })));
+
+$("recMonth").addEventListener("change", e => { recMonth = +e.target.value; renderRecs(); });
 
 // ---- 기록 검색 / 기간 필터 ----
 let feedSearchTimer = 0;

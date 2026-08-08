@@ -198,19 +198,21 @@ def tr(x, y):
     return round(ox + (x - minx) * kx * scale, 1), round(oy + (maxy - y) * scale, 1)
 
 
-paths, labels, meta, groups_of = [], [], {}, {}
+paths, labels, meta, groups_of, coords = [], [], {}, {}, {}
 
 
 def emit(code, name, rings, group):
     """SVG path + 라벨 + 메타 추가"""
     paths.append(f'  <path id="m{code}" data-name="{name}" data-code="{code}" d="{path_d(rings, tr)}"/>')
     main = max(rings, key=ring_area)
-    cx, cy = tr(*ring_centroid(main))
+    lon, lat = ring_centroid(main)
+    cx, cy = tr(lon, lat)
     _, _, w, h = bbox_of(main, tr)
     labels.append(f'  <text x="{q(cx)}" y="{q(cy)}" dy=".35em" data-w="{w}" '
                   f'data-h="{h}" data-code="{code}">{name}</text>')
     meta[code] = name
     groups_of[code] = group
+    coords[code] = [round(lon, 3), round(lat, 3)]   # 날씨 조회용 실제 위경도
 
 
 for jis in sorted(tokyo):
@@ -237,7 +239,7 @@ with open("japan_map.svg", "w", encoding="utf-8") as f:
 regions_out = {str(90 + r): nm for r, (nm, _) in REGIONS.items()}
 regions_out[TOKYO_GROUP] = "도쿄"
 with open("japan_meta.json", "w", encoding="utf-8") as f:
-    json.dump({"names": meta, "regions": regions_out, "groups": groups_of},
-              f, ensure_ascii=False, indent=1)
+    json.dump({"names": meta, "regions": regions_out, "groups": groups_of,
+               "coords": coords}, f, ensure_ascii=False, indent=1)
 
 print(f"일본 지역 {len(paths)}개 (도쿄 시·구 {len(tokyo)}개 포함), 그룹 {len(regions_out)}개")

@@ -264,6 +264,9 @@ def to_path(props, rings, with_fill_id=True):
     return f'  <path {attrs} d="{d}"/>'
 
 
+COORDS = {}   # 지역 코드 -> [경도, 위도] (날씨 추천에서 사용)
+
+
 def point_in_rings(pt, rings):
     x, y = pt
     hit = False
@@ -321,6 +324,7 @@ def label_of(props, rings, text):
     if best:
         span, cx, cy = best
         w = min(w, q(span * kx * scale))
+    COORDS[props["code"]] = [round(cx, 3), round(cy, 3)]   # 날씨 조회용 실제 위경도
     px, py = tr(cx, cy)
     return (f'  <text x="{q(px)}" y="{q(py)}" dy=".35em" data-w="{w}" data-h="{h}" '
             f'data-code="{props["code"]}">{text}</text>')
@@ -357,4 +361,9 @@ svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W * SCALE} {H * 
 '''
 with open("korea_sigungu_map.svg", "w", encoding="utf-8") as f:
     f.write(svg)
+
+# 시·군·구만 (시도 라벨은 제외) 날씨 조회용 좌표로 저장
+muni_codes = {props["code"] for props, rings in muni if rings}
+with open("korea_coords.json", "w", encoding="utf-8") as f:
+    json.dump({c: v for c, v in COORDS.items() if c in muni_codes}, f, indent=1)
 print(f"municipalities={len(muni_paths)} provinces={len(prov_paths)} labels={len(muni_labels) + len(prov_labels)}")
