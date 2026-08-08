@@ -236,25 +236,25 @@
     width: 100%; padding: 9px; margin-top: 4px; border: none; border-radius: 9px;
     background: #f3f4f6; color: #4b5563; font-size: 13px; cursor: pointer;
   }
-  /* 전체 초기화 확인 */
-  #resetModal {
+  /* 전체 초기화 / 지도 삭제 확인 */
+  #resetModal, #delModal {
     position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none;
     align-items: center; justify-content: center; z-index: 45; padding: 20px;
   }
-  #resetModal.show { display: flex; }
-  #resetModal .card { background: #fff; border-radius: 14px; padding: 20px; width: 100%; max-width: 340px; }
-  #resetModal h3 { font-size: 16px; margin-bottom: 8px; }
-  #resetModal p { font-size: 12.5px; color: #6b7280; line-height: 1.55; margin-bottom: 12px; }
-  #resetPw {
+  #resetModal.show, #delModal.show { display: flex; }
+  #resetModal .card, #delModal .card { background: #fff; border-radius: 14px; padding: 20px; width: 100%; max-width: 340px; }
+  #resetModal h3, #delModal h3 { font-size: 16px; margin-bottom: 8px; }
+  #resetModal p, #delModal p { font-size: 12.5px; color: #6b7280; line-height: 1.55; margin-bottom: 12px; }
+  #resetPw, #delPw {
     width: 100%; padding: 10px 12px; font-size: 14px; border: 1px solid #d1d5db;
     border-radius: 8px; margin-bottom: 4px;
   }
-  #resetPw:focus { outline: none; border-color: #b91c1c; }
+  #resetPw:focus, #delPw:focus { outline: none; border-color: #b91c1c; }
   .rm-btns { display: flex; gap: 8px; margin-top: 8px; }
   .rm-btns button { flex: 1; padding: 10px; font-size: 13.5px; border-radius: 9px; cursor: pointer; border: none; }
-  #resetCancel { background: #f3f4f6; color: #4b5563; }
-  #resetConfirm { background: #b91c1c; color: #fff; font-weight: 600; }
-  #resetConfirm:disabled { opacity: .6; cursor: default; }
+  #resetCancel, #delCancel { background: #f3f4f6; color: #4b5563; }
+  #resetConfirm, #delConfirm { background: #b91c1c; color: #fff; font-weight: 600; }
+  #resetConfirm:disabled, #delConfirm:disabled { opacity: .6; cursor: default; }
   .v-addphoto {
     width: 100%; padding: 7px; font-size: 12px; border: 1px dashed #d7dde5;
     border-radius: 7px; background: #fff; color: #6b7280; cursor: pointer;
@@ -327,8 +327,15 @@
     border: 1px solid #e2e8f0; background: #fff; color: #475569;
   }
   .btns button:hover { background: #f1f5f9; border-color: #cbd5e1; }
-  .btns #resetBtn { color: #b91c1c; border-color: #fecaca; }
-  .btns #resetBtn:hover { background: #fef2f2; }
+  .btns #resetBtn, .btns #deleteMapBtn { color: #b91c1c; border-color: #fecaca; }
+  .btns #resetBtn:hover, .btns #deleteMapBtn:hover { background: #fef2f2; }
+  #myRooms .room-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  #myRooms .room-row a { flex: 1; margin-bottom: 0; }
+  #myRooms .room-forget {
+    flex: none; width: 34px; height: 34px; border: 1px solid #e5e7eb; border-radius: 8px;
+    background: #fff; color: #9ca3af; font-size: 16px; line-height: 1; cursor: pointer;
+  }
+  #myRooms .room-forget:hover { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
   #tooltip {
     position: fixed; pointer-events: none; background: rgba(31,41,55,.92); color: #fff;
     font-size: 12.5px; padding: 5px 10px; border-radius: 6px; display: none; z-index: 10;
@@ -538,7 +545,11 @@
       <h2 id="statsHead">시·도별 달성률</h2>
       <div id="provList"></div>
       <div class="btns">
+        <button id="backupBtn">데이터 백업</button>
+        <button id="restoreBtn">백업 불러오기</button>
+        <input id="restoreFile" type="file" accept="application/json,.json" hidden>
         <button id="resetBtn">방문 표시 초기화</button>
+        <button id="deleteMapBtn">지도 삭제</button>
       </div>
     </aside>
   </div>
@@ -571,6 +582,18 @@
     <h3>어느 방문의 사진인가요?</h3>
     <div id="moveList"></div>
     <button id="moveCancel">취소</button>
+  </div>
+</div>
+<div id="delModal">
+  <div class="card">
+    <h3>지도 삭제</h3>
+    <p id="delDesc"></p>
+    <input type="password" id="delPw" placeholder="지도 비밀번호" autocomplete="current-password">
+    <div class="err" id="delErr"></div>
+    <div class="rm-btns">
+      <button id="delCancel">취소</button>
+      <button id="delConfirm">삭제</button>
+    </div>
   </div>
 </div>
 <div id="resetModal">
@@ -696,7 +719,21 @@ function showLanding() {
   const ids = Object.keys(savedRooms);
   $("myRoomsWrap").style.display = ids.length ? "" : "none";
   $("myRooms").innerHTML = ids.map(id =>
-    `<a href="/?room=${encodeURIComponent(id)}">${ICON_PIN} ${escapeHtml(savedRooms[id].name || "")}</a>`).join("");
+    `<div class="room-row">` +
+    `<a href="/?room=${encodeURIComponent(id)}">${ICON_PIN} ${escapeHtml(savedRooms[id].name || "")}</a>` +
+    `<button class="room-forget" data-id="${escapeHtml(id)}" title="목록에서 지우기">&times;</button>` +
+    `</div>`).join("");
+  $("myRooms").querySelectorAll(".room-forget").forEach(b => {
+    b.onclick = () => {
+      // 목록에서만 빼는 것 — 지도 자체는 그대로 남는다 (링크로 다시 들어갈 수 있음)
+      const id = b.dataset.id;
+      if (!confirm(`"${savedRooms[id].name || id}"을(를) 목록에서 지울까요?\n지도는 삭제되지 않고, 링크로 다시 들어갈 수 있습니다.`)) return;
+      delete savedRooms[id];
+      localStorage.setItem("travelRooms", JSON.stringify(savedRooms));
+      try { localStorage.removeItem("state:" + id); } catch {}
+      showLanding();
+    };
+  });
 }
 // 마지막으로 받은 방 상태를 저장 — 오프라인에서도 지도·기록을 볼 수 있게
 function cacheState(id, s) {
@@ -2063,6 +2100,113 @@ MAPSVGS.forEach(el => el.addEventListener("pointermove", e => {
   if (pointers.size === 0) { el.classList.remove("dragging"); tapStart = null; }
   pinchDist = 0;
 })));
+
+// ---- 백업 / 복원 ----
+// 사진은 파일이 아니라 주소만 담는다. 저장소에 원본이 남아 있으면 복원 시 다시 연결되지만,
+// 원본 지도를 삭제하면 사진 파일도 함께 지워지므로 그때는 복원되지 않는다.
+$("backupBtn").onclick = () => {
+  const data = {
+    app: "map-for-memory", version: 1, exportedAt: new Date().toISOString(),
+    room: ROOM, name: $("roomName").textContent,
+    visited: [...visited], notes, photos,
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `여행지도_${data.name || ROOM}_${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+$("restoreBtn").onclick = () => $("restoreFile").click();
+$("restoreFile").addEventListener("change", async e => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  let data;
+  try { data = JSON.parse(await file.text()); } catch { alert("백업 파일을 읽을 수 없습니다."); return; }
+  if (!data || data.app !== "map-for-memory") { alert("이 앱의 백업 파일이 아닙니다."); return; }
+  const cnt = (data.visited || []).length;
+  if (!confirm(`방문 ${cnt}곳과 기록을 지금 지도에 합칩니다.\n기존 기록은 지워지지 않고, 겹치는 항목은 건너뜁니다.\n\n사진은 원본이 지워지지 않았을 때만 함께 복원됩니다.`)) return;
+  $("restoreBtn").disabled = true;
+  const before = { v: visited.size, n: Object.keys(notes).length };
+  try {
+    await restoreBackup(data);
+    alert(`복원 완료 — 방문 ${visited.size - before.v}곳, 기록 ${Object.keys(notes).length - before.n}곳이 추가되었습니다.`);
+  } catch (err) {
+    alert("복원 중 문제가 발생했습니다: " + (err.message || err));
+  } finally {
+    $("restoreBtn").disabled = false;
+  }
+});
+// 합치기 방식 — 이미 있는 방문·기록·사진은 그대로 두고 없는 것만 채운다
+async function restoreBackup(data) {
+  for (const raw of data.visited || []) {
+    const code = mergedTargetOf(String(raw)) || String(raw);
+    if (!nameByCode[code] || visited.has(code)) continue;
+    visited.add(code); markDirty(code);
+    await api("/api/visited", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ room: ROOM, code, on: true }) });
+  }
+  for (const [raw, note] of Object.entries(data.notes || {})) {
+    const code = mergedTargetOf(String(raw)) || String(raw);
+    if (!nameByCode[code]) continue;
+    const cur = getVisits(code);
+    const add = (note.visits || []).filter(v =>
+      !cur.some(c => c.id === v.id || (c.start === v.start && c.end === v.end && c.memo === v.memo)));
+    if (!add.length) continue;
+    const merged = cur.concat(add.map(v => ({ id: v.id || newVid(), start: v.start || "", end: v.end || "", memo: v.memo || "" })));
+    notes[code] = { visits: merged }; markDirty(code);
+    await api("/api/note", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ room: ROOM, code, visits: merged }) });
+  }
+  for (const [raw, list] of Object.entries(data.photos || {})) {
+    const code = mergedTargetOf(String(raw)) || String(raw);
+    if (!nameByCode[code]) continue;
+    photos[code] = photos[code] || [];
+    for (const p of list || []) {
+      if (!p || !p.url || photos[code].some(x => x.url === p.url)) continue;
+      await api(`/api/photo?room=${ROOM}&code=${code}&link=1`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: p.url, name: p.name || "", vid: p.vid || "" }) });
+      photos[code].push({ url: p.url, name: p.name || "", vid: p.vid || "" });
+    }
+    if (!photos[code].length) delete photos[code];
+  }
+  paintVisited(); render(); updateLabels(); renderFeed();
+  if (selected) renderPanel();
+}
+
+// ---- 지도 삭제 ----
+$("deleteMapBtn").onclick = () => {
+  $("delDesc").innerHTML =
+    `<b>${escapeHtml($("roomName").textContent)}</b> 지도를 완전히 삭제합니다.<br>` +
+    `방문 표시·기록·사진이 모두 지워지며 <b>되돌릴 수 없습니다.</b><br>` +
+    `함께 쓰는 사람도 더 이상 열 수 없습니다.`;
+  $("delPw").value = "";
+  $("delErr").textContent = "";
+  $("delModal").classList.add("show");
+  $("delPw").focus();
+};
+$("delCancel").onclick = () => $("delModal").classList.remove("show");
+$("delModal").onclick = (e) => { if (e.target.id === "delModal") $("delModal").classList.remove("show"); };
+$("delPw").onkeydown = (e) => { if (e.key === "Enter") $("delConfirm").click(); };
+$("delConfirm").onclick = async () => {
+  const pw = $("delPw").value;
+  if (!pw) { $("delErr").textContent = "비밀번호를 입력해 주세요."; return; }
+  $("delConfirm").disabled = true;
+  $("delErr").textContent = "";
+  try {
+    await api("/api/rooms", { method: "DELETE", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ room: ROOM, password: pw }) });
+    delete savedRooms[ROOM];
+    localStorage.setItem("travelRooms", JSON.stringify(savedRooms));
+    try { localStorage.removeItem("state:" + ROOM); } catch {}
+    location.href = "/";
+  } catch (e) {
+    $("delErr").textContent = e.message === "Failed to fetch" ? "서버 연결 실패" : (e.message || "삭제 실패");
+    $("delConfirm").disabled = false;
+  }
+};
 
 // ---- 내보내기 / 가져오기 / 초기화 ----
 // 초기화 — 지금 보고 있는 나라의 방문 표시만, 지도 비밀번호 확인 후 실행

@@ -1,6 +1,17 @@
 import { put, del } from "@vercel/blob";
 import { redis, authRoom } from "./_lib.js";
 
+// 백업 복원은 이미 올라간 사진 URL만 다시 연결한다.
+// 외부 주소를 끼워 넣지 못하도록 우리 저장소 도메인만 허용.
+function isOwnPhotoUrl(u) {
+  if (typeof u !== "string") return false;
+  try {
+    return new URL(u).hostname.endsWith(".public.blob.vercel-storage.com");
+  } catch {
+    return false;
+  }
+}
+
 export default async function handler(req, res) {
   const { room, code, vid } = req.query;
   if (!(await authRoom(req, room))) return res.status(403).json({ error: "unauthorized" });
@@ -10,6 +21,21 @@ export default async function handler(req, res) {
   const key = `room:${room}:photos`;
 
   if (req.method === "POST") {
+    // 백업 복원 — 새로 올리지 않고 기존 사진 URL만 이 지역에 다시 연결
+    if (req.query.link === "1") {
+      const b = req.body || {};
+      if (!isOwnPhotoUrl(b.url)) return res.status(400).json({ error: "bad url" });
+      const list = (await redis.hget(key, code)) || [];
+      if (!list.some((p) => p.url === b.url)) {
+        list.push({
+          url: b.url,
+          name: String(b.name || "photo.jpg").replace(/[^\w.\-가-힣 ]/g, "_").slice(-80),
+          vid: typeof b.vid === "string" && /^[\w-]{1,40}$/.test(b.vid) ? b.vid : "",
+        });
+        await redis.hset(key, { [code]: list });
+      }
+      return res.json({ ok: true, url: b.url });
+    }
     const name = decodeURIComponent(req.headers["x-filename"] || "photo.jpg")
       .replace(/[^\w.\-가-힣 ]/g, "_").slice(-80) || "photo.jpg";
     const body = req.body;

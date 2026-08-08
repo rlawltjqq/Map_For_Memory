@@ -13,6 +13,7 @@ import json
 import os
 import re
 import secrets
+import shutil
 import threading
 import time
 from functools import partial
@@ -257,6 +258,32 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             vid_raw = (q.get("vid") or [""])[0]
             visit_id = vid_raw if re.fullmatch(r"[\w-]{1,40}", vid_raw or "") else ""
+
+            # 백업 복원 — 새로 올리지 않고 기존 사진 URL만 이 지역에 다시 연결
+            if (q.get("link") or [""])[0] == "1":
+                body = self.read_json()
+                with _lock:
+                    rooms = load_rooms()
+                    meta = self.auth(rooms, room_id)
+                    if not meta:
+                        self.send_json({"error": "unauthorized"}, 403)
+                        return
+                    link_url = body.get("url") or ""
+                    # 외부 주소를 끼워 넣지 못하게 우리 저장소 경로만 허용.
+                    # (다른 지도의 백업도 복원할 수 있어야 하므로 방 단위로는 묶지 않는다)
+                    if not link_url.startswith("/data/photos/") or ".." in link_url:
+                        self.send_json({"error": "bad url"}, 400)
+                        return
+                    files = meta.setdefault("photos", {}).setdefault(code, [])
+                    if not any(p["url"] == link_url for p in files):
+                        v = body.get("vid") or ""
+                        files.append({"url": link_url,
+                                      "name": safe_name(body.get("name") or "photo.jpg"),
+                                      "vid": v if re.fullmatch(r"[\w-]{1,40}", v) else ""})
+                    save_rooms(rooms)
+                self.send_json({"ok": True, "url": link_url})
+                return
+
             data = self.read_body_bytes()
             with _lock:
                 rooms = load_rooms()
@@ -327,6 +354,24 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_DELETE(self):
         url = urlparse(self.path)
+        # 지도 삭제 — 비밀번호 확인 후 사진 파일까지 모두 제거 (되돌릴 수 없음)
+        if url.path == "/api/rooms":
+            body = self.read_json()
+            room_id = body.get("room") or ""
+            with _lock:
+                rooms = load_rooms()
+                meta = self.auth(rooms, room_id)
+                if not meta:
+                    self.send_json({"error": "unauthorized"}, 403)
+                    return
+                if not hmac.compare_digest(hash_pw(body.get("password") or "", meta["salt"]), meta["pwhash"]):
+                    self.send_json({"error": "비밀번호가 틀렸습니다"}, 403)
+                    return
+                shutil.rmtree(os.path.join(PHOTO_DIR, room_id), ignore_errors=True)
+                rooms.pop(room_id, None)
+                save_rooms(rooms)
+            self.send_json({"ok": True})
+            return
         if url.path != "/api/photo":
             self.send_json({"error": "not found"}, 404)
             return
