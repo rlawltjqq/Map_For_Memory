@@ -89,7 +89,32 @@ def resolve_festivals():
     return out
 
 
+def resolve_region(entry, label):
+    """{region, prov} -> 지도 코드. 하나로 좁혀지지 않으면 빌드를 멈춘다."""
+    cands = name_to_codes.get(entry["region"], [])
+    if len(cands) > 1 and entry.get("prov"):
+        cands = [c for c in cands if prov_short.get(c[:2]) == entry["prov"]]
+    if len(cands) != 1:
+        raise SystemExit(f'{label}: "{entry["region"]}" -> {cands or "없음"}')
+    return cands[0]
+
+
+def resolve_trending():
+    """인기 여행지 큐레이션 -> {코드: {s:점수, t:테마}} + 기준일"""
+    try:
+        with open("trending.json", encoding="utf-8") as f:
+            raw = json.load(f)
+    except FileNotFoundError:
+        return {}, ""
+    out = {}
+    for country in ("kr", "jp"):
+        for e in raw.get(country, []):
+            out[resolve_region(e, f'인기 여행지 {e["region"]}')] = {"s": e["score"], "t": e["theme"]}
+    return out, raw.get("curatedAt", "")
+
+
 festivals = resolve_festivals()
+trending, trending_at = resolve_trending()
 
 try:
     with open("climate.json", encoding="utf-8") as f:
@@ -101,6 +126,8 @@ climate = {c: v for c, v in climate.items() if c in map_codes}
 
 html = html.replace("__CLIMATE__", json.dumps(climate, separators=(",", ":")))
 html = html.replace("__FESTIVALS__", json.dumps(festivals, ensure_ascii=False, separators=(",", ":")))
+html = html.replace("__TRENDING__", json.dumps(trending, ensure_ascii=False, separators=(",", ":")))
+html = html.replace("__TRENDING_AT__", json.dumps(trending_at, ensure_ascii=False))
 html = html.replace("__PROV__", json.dumps(prov_short, ensure_ascii=False))
 html = html.replace("__PROV_JP__", json.dumps(jp_meta["regions"], ensure_ascii=False))
 html = html.replace("__EMBLEMS__", json.dumps(emblems, ensure_ascii=False))

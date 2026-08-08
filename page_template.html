@@ -680,6 +680,8 @@ const PROV = Object.assign({}, PROV_KR, PROV_JP);   // 코드 앞 2자리 → �
 const EMBLEMS = __EMBLEMS__;   // 지역 코드 → 공식 휘장(심벌) 이미지 URL
 const CLIMATE = __CLIMATE__;   // 지역 코드 → [[월평균기온, 월강수량], x12]
 const FESTIVALS = __FESTIVALS__;   // 매년 열리는 대표 축제 [{n:이름, c:코드, m:[월], t:태그, d:설명}]
+const TRENDING = __TRENDING__;     // 인기 여행지 {코드: {s:점수, t:테마}}
+const TRENDING_AT = __TRENDING_AT__;   // 인기도 기준일 (실시간 아님을 밝히기 위함)
 const tooltip = document.getElementById("tooltip");
 const $ = id => document.getElementById(id);
 
@@ -1527,12 +1529,61 @@ function renderStatsCards() {
 // CLIMATE: 지역 코드 -> [[월평균기온, 월강수량], x12] (2020~2024 실측 평년값, 빌드 때 미리 받아둠)
 let recMonth = new Date().getMonth();      // 0-11
 
+// 추천 점수 항목별 비중. 자료가 없는 항목은 0점 처리하지 않고 빼낸 뒤
+// 남은 비중으로 다시 나눈다 — 인기도처럼 일부 지역만 자료가 있는 항목 때문에
+// 자료 없는 지역이 부당하게 밀리는 것을 막기 위함.
+// (지역 분산은 점수가 아니라 시·도당 노출 개수 제한으로 처리한다)
+const REC_WEIGHTS = { weather: 0.35, season: 0.25, popular: 0.20, taste: 0.10 };
+
 // 여행하기 좋은 날씨 점수 — 기온이 18도에 가까울수록, 비가 적을수록 높다
 function climateScore(t, p) {
   if (t == null || p == null) return null;
   const warmth = Math.max(0, 100 - Math.abs(t - 18) * 6);
   const dry = Math.max(0, 100 - Math.max(0, p - 60) * 0.35);
   return Math.round(warmth * 0.65 + dry * 0.35);
+}
+
+// 그 달에 축제가 있으면 높게. 없다고 0점은 아니라서 기본값을 둔다.
+function seasonScore(code, month) {
+  const fs = FESTIVALS.filter(f => f.c === code);
+  if (!fs.length) return 30;
+  if (fs.some(f => f.m.includes(month))) return 100;
+  const near = (month % 12) + 1, prev = ((month + 10) % 12) + 1;
+  return fs.some(f => f.m.includes(near) || f.m.includes(prev)) ? 55 : 35;
+}
+
+// 지금까지 다닌 곳에서 취향을 읽는다 (지역 유형 + 자주 간 시·도).
+// 기록이 적으면 신호가 아니라 잡음이라 아예 항목에서 뺀다.
+function tasteProfile() {
+  const mine = [...visited].filter(c => nameByCode[c] && countryOfCode(c) === COUNTRY);
+  if (mine.length < 6) return null;      // 몇 곳 안 가봤으면 취향이라 할 만한 게 없다
+  const kind = {}, prov = {};
+  mine.forEach(c => {
+    const k = (nameByCode[c] || "").slice(-1);      // 시 / 군 / 구
+    kind[k] = (kind[k] || 0) + 1;
+    const g = groupOf(c);
+    prov[g] = (prov[g] || 0) + 1;
+  });
+  return { kind, prov, n: mine.length };
+}
+function tasteScore(code, tp) {
+  if (!tp) return null;
+  const k = (nameByCode[code] || "").slice(-1);
+  const kindShare = (tp.kind[k] || 0) / tp.n;             // 같은 유형을 얼마나 좋아하나
+  const provShare = (tp.prov[groupOf(code)] || 0) / tp.n; // 그 시·도를 얼마나 자주 갔나
+  // 한 지역만 계속 밀지 않도록 시·도 쏠림은 상한을 둔다
+  return Math.round(Math.min(1, kindShare * 0.6 + Math.min(provShare, 0.4) * 1.0) * 100);
+}
+
+// 항목별 점수를 비중에 맞춰 합산하되, 자료 없는 항목은 비중째로 제외
+function recScore(parts) {
+  let sum = 0, w = 0;
+  for (const key in REC_WEIGHTS) {
+    if (parts[key] == null) continue;
+    sum += parts[key] * REC_WEIGHTS[key];
+    w += REC_WEIGHTS[key];
+  }
+  return w ? Math.round(sum / w) : null;
 }
 function climateWhy(t, p) {
   const heat = t >= 26 ? "덥지만" : t >= 20 ? "따뜻하고" : t >= 12 ? "선선하고" : t >= 4 ? "쌀쌀하고" : "춥지만";
@@ -1548,6 +1599,8 @@ function renderRecs() {
   }
   const rows = [];
   let unvisited = 0, haveData = 0;
+  const tp = tasteProfile();
+  const month = recMonth + 1;
   Object.keys(nameByCode).forEach(code => {
     if (countryOfCode(code) !== COUNTRY) return;
     const c = CLIMATE[code];
@@ -1556,9 +1609,16 @@ function renderRecs() {
     unvisited++;
     if (!c || !c[recMonth]) return;
     const [t, p] = c[recMonth];
-    const s = climateScore(t, p);
-    if (s == null) return;
-    rows.push({ code, t, p, s });
+    const weather = climateScore(t, p);
+    if (weather == null) return;
+    const hot = TRENDING[code];
+    const parts = {
+      weather,
+      season: seasonScore(code, month),
+      popular: hot ? hot.s : null,                 // 자료 없으면 비중째 제외
+      taste: tasteScore(code, tp),
+    };
+    rows.push({ code, t, p, parts, hot, s: recScore(parts) });
   });
   rows.sort((a, b) => b.s - a.s || a.code.localeCompare(b.code));
   // 같은 시·도가 몰리면 목록이 단조로워진다 (대구 자치구만 4개 같은 식). 시·도당 2곳까지.
@@ -1571,18 +1631,28 @@ function renderRecs() {
   }
   const cName = COUNTRY === "jp" ? "일본" : "한국";
   // 결과가 없는 이유를 구분해서 알린다 (다 가본 것과 날씨 자료가 없는 것은 다르다)
+  const at = TRENDING_AT ? `인기도는 ${TRENDING_AT} 기준 편집 자료입니다.` : "";
   note.textContent = rows.length
-    ? `${cName}에서 아직 안 가본 ${rows.length}곳 중, ${recMonth + 1}월 날씨가 좋은 순입니다.`
+    ? `${cName}에서 아직 안 가본 ${rows.length}곳 중 ${month}월 날씨·축제·인기·취향을 함께 본 순서입니다. ${at}`
     : !haveData ? `${cName}은 아직 날씨 자료가 없습니다.`
     : !unvisited ? `${cName}은 이미 다 다녀오셨네요.`
     : `추천할 곳을 찾지 못했습니다.`;
   list.innerHTML = top.map(r => {
     const em = EMBLEMS[r.code];
+    // 왜 추천됐는지 근거를 짚어준다 (점수에 크게 기여한 항목 순)
+    const why = [];
+    if (r.parts.weather >= 70) why.push(`${month}월 날씨 좋음`);
+    if (r.parts.season >= 100) why.push("이달 축제");
+    else if (r.parts.season >= 55) why.push("축제 시즌 근접");
+    if (r.hot) why.push(escapeHtml(r.hot.t));
+    // 뚜렷한 쏠림일 때만 붙인다 (기준이 낮으면 3분의 1에 붙어 의미가 없어진다)
+    if (r.parts.taste != null && r.parts.taste >= 70) why.push("취향과 비슷");
+    if (!why.length) why.push(climateWhy(r.t, r.p));
     return `<div class="rec-card" data-code="${r.code}">
       ${em ? `<img src="${em}" alt="" loading="lazy">` : ""}
       <div class="rec-main">
         <div class="rec-name">${escapeHtml(nameByCode[r.code])}</div>
-        <div class="rec-why">${PROV[groupOf(r.code)] || ""} · ${climateWhy(r.t, r.p)}</div>
+        <div class="rec-why">${PROV[groupOf(r.code)] || ""} · ${why.join(" · ")}</div>
       </div>
       <div class="rec-num"><b>${r.t}°</b>${r.p}mm</div>
     </div>`;
