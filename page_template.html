@@ -299,6 +299,10 @@
     flex: none; font-size: 10.5px; font-weight: 600; color: #2d6a4f; background: #eaf5ef;
     border-radius: 6px; padding: 3px 6px; min-width: 38px; text-align: center;
   }
+  .fes-photo {
+    flex: none; width: 54px; height: 54px; object-fit: cover; border-radius: 8px;
+    background: #f3f4f6;
+  }
   .fes-main { flex: 1; min-width: 0; }
   .fes-name { font-size: 13px; font-weight: 600; color: #1f2937; }
   .fes-sub { font-size: 11.5px; color: #6b7280; margin-top: 1px; }
@@ -1704,8 +1708,13 @@ function renderFestivals() {
     : `${m}월에 등록된 ${cName} 축제가 없습니다.`;
   list.innerHTML = rows.map(f => {
     const span = f.m.length > 1 ? `${f.m[0]}~${f.m[f.m.length - 1]}월` : `${f.m[0]}월`;
+    // 사진이 있으면 왼쪽에, 없으면 태그 배지로 (사진은 절반 정도만 있다)
+    const lead = f.p
+      ? `<img class="fes-photo" src="${f.p}" alt="" loading="lazy" decoding="async"
+              title="${escapeHtml(f.cr || "")}">`
+      : `<span class="fes-tag">${escapeHtml(f.t)}</span>`;
     return `<div class="fes-card${visited.has(f.c) ? " done" : ""}" data-code="${f.c}">
-      <span class="fes-tag">${escapeHtml(f.t)}</span>
+      ${lead}
       <div class="fes-main">
         <div class="fes-name">${escapeHtml(f.n)}</div>
         <div class="fes-sub">${escapeHtml(nameByCode[f.c])} · ${escapeHtml(f.d)}</div>

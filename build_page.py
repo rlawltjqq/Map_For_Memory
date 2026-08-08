@@ -73,12 +73,23 @@ def resolve_festivals():
             raw = json.load(f)
     except FileNotFoundError:
         return []
+    try:
+        with open("festival_photo_index.json", encoding="utf-8") as f:
+            photos = json.load(f)
+    except FileNotFoundError:
+        photos = {}
     out = []
     for country in ("kr", "jp"):
         for fes in raw.get(country, []):
             code = resolve_region(fes, f'축제 {fes["name"]}')
-            out.append({"n": fes["name"], "c": code, "m": fes["months"],
-                        "t": fes["tag"], "d": fes["desc"]})
+            item = {"n": fes["name"], "c": code, "m": fes["months"],
+                    "t": fes["tag"], "d": fes["desc"]}
+            ph = photos.get(fes["name"])
+            if ph and os.path.exists(os.path.join("festival_photos", ph["file"])):
+                # 위키미디어 사진은 대개 저작자 표기가 필요해 출처를 함께 싣는다
+                item["p"] = "festival_photos/" + ph["file"]
+                item["cr"] = " / ".join(x for x in (ph.get("author"), ph.get("license")) if x)
+            out.append(item)
     return out
 
 

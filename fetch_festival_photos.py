@@ -6,6 +6,8 @@
 위키미디어 이미지는 대개 출처 표기가 필요해 저작자·라이선스도 같이 받는다.
 """
 import json
+import re
+import sys
 import time
 import urllib.parse
 import urllib.request
@@ -111,7 +113,10 @@ def main():
                 **(credit(fname) if fname else {}),
             }
             mark = "O" if url else "-"
-            print(f"  {mark} {name} <- {title}")
+            # 콘솔 인코딩(cp949)이 일본어를 못 찍어 죽는 일이 있어 안전하게 출력
+            line = f"  {mark} {name} <- {title}"
+            enc = sys.stdout.encoding or "utf-8"
+            print(line.encode(enc, "replace").decode(enc, "replace"))
             with open("festival_photos.json", "w", encoding="utf-8") as f:
                 json.dump(out, f, ensure_ascii=False, indent=1)
             time.sleep(0.6)
