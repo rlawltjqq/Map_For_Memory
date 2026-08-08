@@ -267,6 +267,17 @@
   .add-visit:hover { background: #f1f7f3; border-color: #3b9c6e; color: #2d6a4f; }
   #visitList:empty + .add-visit { border-color: #9ca3af; }
   /* 여행 통계 카드 */
+  #feedFilter { display: flex; gap: 6px; margin-bottom: 10px; }
+  #feedSearch {
+    flex: 1; min-width: 0; padding: 8px 11px; font-size: 13px; border: 1px solid #e5e7eb;
+    border-radius: 9px; background: #fff; color: #1f2937;
+  }
+  #feedSearch:focus { outline: none; border-color: #3b9c6e; }
+  #feedYear {
+    flex: none; padding: 8px 9px; font-size: 13px; border: 1px solid #e5e7eb;
+    border-radius: 9px; background: #fff; color: #4b5563;
+  }
+  #feedEmpty { font-size: 13px; color: #9ca3af; text-align: center; padding: 22px 0; }
   #statsCards { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
   #statsCards:empty { display: none; }
   #statsCards:empty + #feedHead { margin-top: 12px; }
@@ -540,6 +551,11 @@
       <div id="statsCards"></div>
 
       <h2 id="feedHead">여행 앨범</h2>
+      <div id="feedFilter">
+        <input id="feedSearch" type="search" placeholder="지역명·메모 검색" autocomplete="off">
+        <select id="feedYear"><option value="">전체 기간</option></select>
+      </div>
+      <div id="feedEmpty" style="display:none"></div>
       <div id="memoryFeed"></div>
 
       <h2 id="statsHead">시·도별 달성률</h2>
@@ -1451,23 +1467,68 @@ function renderStatsCards() {
   $("statsCardHead").style.display = cards.length ? "" : "none";
 }
 
+// 기록 검색·기간 필터 상태 (지도 상태가 아니라 화면 조건이라 서버에 저장하지 않는다)
+let feedQuery = "", feedYear = "";
+const visitYear = v => (v.start || v.end || "").slice(0, 4);
+
+// 연도 목록은 지금 나라의 기록에서 뽑는다 (나라를 바꾸면 다시 채워짐)
+function syncYearOptions() {
+  const sel = $("feedYear");
+  if (!sel) return;
+  const years = new Set();
+  Object.keys(notes).forEach(code => {
+    if (!nameByCode[code] || countryOfCode(code) !== COUNTRY) return;
+    getVisits(code).forEach(v => { const y = visitYear(v); if (y) years.add(y); });
+  });
+  const list = [...years].sort((a, b) => b.localeCompare(a));
+  if (sel.dataset.years === list.join(",")) return;    // 바뀐 게 없으면 그대로
+  sel.dataset.years = list.join(",");
+  // 지금 고른 연도가 사라졌으면 전체로 되돌린다
+  if (feedYear && !years.has(feedYear)) feedYear = "";
+  sel.innerHTML = `<option value="">전체 기간</option>` +
+    list.map(y => `<option value="${y}">${y}년</option>`).join("");
+  sel.value = feedYear;
+}
+
 function renderFeed() {
   renderStatsCards();
   const feed = $("memoryFeed");
   if (!feed) return;
+  syncYearOptions();
+  const q = feedQuery.trim().toLowerCase();
   const entries = [];
+  let totalCodes = 0;
   const codes = new Set([...Object.keys(notes), ...Object.keys(photos)]);
   codes.forEach(code => {
     if (!nameByCode[code]) return;   // 지도에 없는 코드는 건너뜀
     if (countryOfCode(code) !== COUNTRY) return;   // 현재 나라의 기록만
-    const visits = getVisits(code).filter(v => v.start || v.end || v.memo);
-    const ph = photos[code] || [];
+    let visits = getVisits(code).filter(v => v.start || v.end || v.memo);
+    let ph = photos[code] || [];
     if (!visits.length && ph.length === 0) return;
+    totalCodes++;
+    // 기간 필터: 해당 연도의 방문만 남기고, 남는 게 없으면 카드를 빼낸다
+    if (feedYear) {
+      visits = visits.filter(v => visitYear(v) === feedYear);
+      if (!visits.length) return;
+      const vids = new Set(visits.map(v => v.id));
+      ph = ph.filter(p => p.vid && vids.has(p.vid));
+    }
+    // 검색: 지역명·시도명·메모에서 찾는다
+    if (q) {
+      const hay = [nameByCode[code], PROV[groupOf(code)] || "",
+                   ...visits.map(v => v.memo || "")].join(" ").toLowerCase();
+      if (!hay.includes(q)) return;
+    }
     // 최신 방문이 위로
     visits.sort((a, b) => (b.start || b.end || "0").localeCompare(a.start || a.end || "0"));
     entries.push({ code, visits, photos: ph, latest: (visits[0] && (visits[0].start || visits[0].end)) || "0" });
   });
   entries.sort((a, b) => b.latest.localeCompare(a.latest));
+  const filtering = !!(q || feedYear);
+  $("feedFilter").style.display = totalCodes > 1 || filtering ? "" : "none";
+  const empty = $("feedEmpty");
+  empty.style.display = filtering && !entries.length ? "" : "none";
+  empty.textContent = "조건에 맞는 기록이 없습니다.";
   feed.innerHTML = entries.map(e => {
     const emblem = EMBLEMS[e.code];
     const prov = PROV[groupOf(e.code)] || "";
@@ -2100,6 +2161,15 @@ MAPSVGS.forEach(el => el.addEventListener("pointermove", e => {
   if (pointers.size === 0) { el.classList.remove("dragging"); tapStart = null; }
   pinchDist = 0;
 })));
+
+// ---- 기록 검색 / 기간 필터 ----
+let feedSearchTimer = 0;
+$("feedSearch").addEventListener("input", e => {
+  const v = e.target.value;
+  clearTimeout(feedSearchTimer);
+  feedSearchTimer = setTimeout(() => { feedQuery = v; renderFeed(); }, 150);
+});
+$("feedYear").addEventListener("change", e => { feedYear = e.target.value; renderFeed(); });
 
 // ---- 백업 / 복원 ----
 // 사진은 파일이 아니라 주소만 담는다. 저장소에 원본이 남아 있으면 복원 시 다시 연결되지만,
