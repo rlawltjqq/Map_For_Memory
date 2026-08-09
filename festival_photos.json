@@ -2,16 +2,20 @@
  "화천 산천어축제": {
   "region": "화천군",
   "lang": "ko",
-  "page": null,
-  "url": null,
-  "file": null
+  "page": "commons:Hwacheon Sancheoneo Ice Festival 01 (52620586388).jpg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/b/b8/Hwacheon_Sancheoneo_Ice_Festival_01_%2852620586388%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "file": "Hwacheon Sancheoneo Ice Festival 01 (52620586388).jpg",
+  "tried2": true,
+  "author": "Republic of  Korea from Seoul, Republic of Korea",
+  "license": "CC BY-SA 2.0"
  },
  "인제 빙어축제": {
   "region": "인제군",
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "태백산 눈축제": {
   "region": "태백시",
@@ -27,28 +31,32 @@
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "울진 대게와 붉은대게축제": {
   "region": "울진군",
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "광양 매화축제": {
   "region": "광양시",
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "구례 산수유꽃축제": {
   "region": "구례군",
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "제주 들불축제": {
   "region": "제주시",
@@ -64,14 +72,19 @@
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true,
+  "dropped": "가수 인물 사진 — 소싸움과 무관"
  },
  "통영 국제음악제": {
   "region": "통영시",
   "lang": "ko",
-  "page": null,
-  "url": null,
-  "file": null
+  "page": "commons:Geographer at TIMF.jpg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/e/e5/Geographer_at_TIMF.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "file": "Geographer at TIMF.jpg",
+  "tried2": true,
+  "author": "Georgio",
+  "license": "CC BY 2.0"
  },
  "진해 군항제": {
   "region": "창원시",
@@ -87,14 +100,16 @@
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "고창 청보리밭축제": {
   "region": "고창군",
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "함평 나비대축제": {
   "region": "함평군",
@@ -110,21 +125,26 @@
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "보성 다향대축제": {
   "region": "보성군",
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "남원 춘향제": {
   "region": "남원시",
   "lang": "ko",
-  "page": null,
-  "url": null,
-  "file": null
+  "page": "commons:Chunhyang Festival2.jpg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/0/09/Chunhyang_Festival2.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "file": "Chunhyang Festival2.jpg",
+  "tried2": true,
+  "author": "Shamus7792003 (talk) (Uploads)",
+  "license": "Public domain"
  },
  "춘천 마임축제": {
   "region": "춘천시",
@@ -140,14 +160,16 @@
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "여수 거북선축제": {
   "region": "여수시",
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "강릉 단오제": {
   "region": "강릉시",
@@ -172,98 +194,120 @@
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true,
+  "dropped": "어느 축제인지 불명확"
  },
  "정남진 장흥 물축제": {
   "region": "장흥군",
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "봉화 은어축제": {
   "region": "봉화군",
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "평창 대관령음악제": {
   "region": "평창군",
   "lang": "ko",
-  "page": null,
-  "url": null,
-  "file": null
+  "page": "commons:Yeol Eum Son, 19th Music in PyeongChang, 6 July 2022, Alpensia Concert Hall.jpg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/2/25/Yeol_Eum_Son%2C_19th_Music_in_PyeongChang%2C_6_July_2022%2C_Alpensia_Concert_Hall.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "file": "Yeol Eum Son, 19th Music in PyeongChang, 6 July 2022, Alpensia Concert Hall.jpg",
+  "tried2": true,
+  "author": "이하 이만식 - 네이버 블로그/Naver Blog",
+  "license": "CC BY-SA 2.0 kr"
  },
  "강진 청자축제": {
   "region": "강진군",
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "부산 바다축제": {
   "region": "해운대구",
   "lang": "ko",
-  "page": null,
-  "url": null,
-  "file": null
+  "page": "commons:Taemin at the Busan Sea Festival 2010 02.jpg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/f/f3/Taemin_at_the_Busan_Sea_Festival_2010_02.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "file": "Taemin at the Busan Sea Festival 2010 02.jpg",
+  "tried2": true,
+  "author": "85246.tistory",
+  "license": "CC BY 4.0"
  },
  "무주 반딧불축제": {
   "region": "무주군",
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "제천 국제음악영화제": {
   "region": "제천시",
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true,
+  "dropped": "동영상 파일(.webm) — 이미지로 표시 불가"
  },
  "안동 국제탈춤페스티벌": {
   "region": "안동시",
   "lang": "ko",
-  "page": null,
-  "url": null,
-  "file": null
+  "page": "commons:2015 Andong Mask Dance Festival 16.JPG",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/6/61/2015_Andong_Mask_Dance_Festival_16.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "file": "2015 Andong Mask Dance Festival 16.JPG",
+  "tried2": true,
+  "author": "hyolee2",
+  "license": "CC BY-SA 3.0"
  },
  "금산 인삼축제": {
   "region": "금산군",
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "산청 한방약초축제": {
   "region": "산청군",
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "김제 지평선축제": {
   "region": "김제시",
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "안성 바우덕이축제": {
   "region": "안성시",
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "영동 난계국악축제": {
   "region": "영동군",
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "진주 남강유등축제": {
   "region": "진주시",
@@ -297,42 +341,49 @@
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "자라섬 재즈페스티벌": {
   "region": "가평군",
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true,
+  "dropped": "밴드 사진 — 자라섬 축제와 연관 확인 불가"
  },
  "논산 강경젓갈축제": {
   "region": "논산시",
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "서산 해미읍성축제": {
   "region": "서산시",
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "순천만 갈대축제": {
   "region": "순천시",
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "광주 세계김치축제": {
   "region": "남구",
   "lang": "ko",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "서울 빛초롱축제": {
   "region": "종로구",
@@ -348,7 +399,8 @@
   "lang": "ja",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "삿포로 눈축제": {
   "region": "홋카이도",
@@ -382,7 +434,8 @@
   "lang": "ja",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "삿포로 라일락축제": {
   "region": "홋카이도",
@@ -443,14 +496,16 @@
   "lang": "ja",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "아키타 간토 마츠리": {
   "region": "아키타현",
   "lang": "ja",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "센다이 다나바타 마츠리": {
   "region": "미야기현",
@@ -466,7 +521,8 @@
   "lang": "ja",
   "page": null,
   "url": null,
-  "file": null
+  "file": null,
+  "tried2": true
  },
  "도쿠시마 아와오도리": {
   "region": "도쿠시마현",

@@ -49,6 +49,10 @@ def main():
         if re.search(r"logo|poster|symbol", info.get("file", ""), re.I):
             print(f"  건너뜀(로고) {name}")
             continue
+        # 커먼즈에는 동영상·음성도 섞여 있어 이미지가 아니면 카드에 못 쓴다
+        if not re.search(r"\.(jpe?g|png|webp)$", info.get("file", ""), re.I):
+            print(f"  건너뜀(이미지 아님) {name}")
+            continue
         safe = re.sub(r"[^\w가-힣]+", "_", name).strip("_")
         ext = ".png" if info["url"].lower().endswith(".svg") else os.path.splitext(
             urllib.parse.urlparse(info["url"]).path)[1] or ".jpg"
