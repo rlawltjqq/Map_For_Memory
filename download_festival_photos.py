@@ -58,10 +58,12 @@ def main():
             urllib.parse.urlparse(info["url"]).path)[1] or ".jpg"
         path = os.path.join(OUT, safe + ext)
         if not os.path.exists(path):
+            # TourAPI 사진은 그 주소에서 바로 받는다 (커먼즈 썸네일 규칙이 없다)
+            direct = not info.get("url", "").startswith("https://upload.wikimedia.org")
             got = False
             for attempt in range(4):            # 요청 제한에 자주 걸려 재시도가 필요하다
                 try:
-                    turl = thumb_url(info.get("file"), WIDTHS[0])
+                    turl = info["url"] if direct else thumb_url(info.get("file"), WIDTHS[0])
                     if not turl:
                         break
                     req = urllib.request.Request(turl, headers=UA)

@@ -1,0 +1,179 @@
+# -*- coding: utf-8 -*-
+"""한국관광공사 TourAPI에서 축제 사진과 실제 일정을 받아온다.
+
+위키백과·커먼즈로는 64건 중 29건밖에 못 채웠다. TourAPI는 전국 축제를
+사진과 함께 제공하므로 커버리지가 훨씬 높다.
+
+준비:
+  1) https://www.data.go.kr 회원가입 후 '한국관광공사_국문 관광정보 서비스' 활용신청
+  2) 발급받은 일반 인증키(Decoding)를 환경변수나 .env.local에 넣는다
+       TOUR_API_KEY=발급받은키
+  3) python fetch_tourapi_photos.py
+
+결과: tourapi_festivals.json (축제명 -> 사진주소·기간), 이어서
+      download_festival_photos.py가 내려받을 수 있게 festival_photos.json에 합친다.
+"""
+import json
+import os
+import re
+import sys
+import time
+import urllib.parse
+import urllib.request
+
+# 2025년에 KorService1 -> KorService2로 옮겨갔다. 둘 다 시도한다.
+HOSTS = [
+    ("https://apis.data.go.kr/B551011/KorService2", "searchFestival2"),
+    ("https://apis.data.go.kr/B551011/KorService1", "searchFestival1"),
+]
+UA = {"User-Agent": "MapForMemory/1.0"}
+
+
+def load_key():
+    key = os.environ.get("TOUR_API_KEY")
+    if key:
+        return key.strip()
+    try:
+        with open(".env.local", encoding="utf-8") as f:
+            for line in f:
+                if line.strip().startswith("TOUR_API_KEY="):
+                    return line.split("=", 1)[1].strip().strip('"').strip("'")
+    except FileNotFoundError:
+        pass
+    return None
+
+
+def fetch_page(base, op, key, start_date, page, rows=100):
+    qs = urllib.parse.urlencode({
+        "serviceKey": key, "MobileOS": "ETC", "MobileApp": "MapForMemory",
+        "_type": "json", "eventStartDate": start_date,
+        "numOfRows": rows, "pageNo": page, "arrange": "A",
+    }, safe="%")           # 인증키에 이미 %가 들어있을 수 있어 다시 인코딩하지 않는다
+    req = urllib.request.Request(f"{base}/{op}?{qs}", headers=UA)
+    with urllib.request.urlopen(req, timeout=60) as r:
+        raw = r.read().decode("utf-8", "replace")
+    if raw.lstrip().startswith("<"):        # 오류는 XML로 온다
+        msg = re.search(r"<returnAuthMsg>([^<]*)", raw) or re.search(r"<errMsg>([^<]*)", raw)
+        raise RuntimeError(f"API 오류: {msg.group(1) if msg else raw[:160]}")
+    body = json.loads(raw).get("response", {}).get("body", {})
+    items = body.get("items") or {}
+    got = items.get("item") if isinstance(items, dict) else None
+    return (got or []), int(body.get("totalCount") or 0)
+
+
+def fetch_all(key, start_date):
+    last_err = None
+    for base, op in HOSTS:
+        try:
+            first, total = fetch_page(base, op, key, start_date, 1)
+            out = list(first)
+            pages = (total + 99) // 100
+            for p in range(2, pages + 1):
+                items, _ = fetch_page(base, op, key, start_date, p)
+                out += items
+                print(f"  {len(out)}/{total}")
+                time.sleep(0.3)
+            print(f"{op}: {len(out)}건 수신")
+            return out
+        except Exception as e:
+            last_err = e
+            print(f"  {op} 실패: {e}")
+    raise SystemExit(f"TourAPI 호출 실패: {last_err}")
+
+
+def norm(s):
+    """비교용 정규화 — 공백·괄호·'제N회' 같은 수식어 제거"""
+    s = re.sub(r"제?\s*\d+\s*회", "", s or "")
+    s = re.sub(r"[\s()\[\]{}<>·,~\-—]", "", s)
+    return s
+
+
+def core_tokens(name):
+    """축제명에서 특징적인 조각 (지역명 + 핵심어)"""
+    n = norm(name)
+    return [t for t in re.split(r"(축제|페스티벌|제)", n) if len(t) >= 2]
+
+
+def match(fes_name, api_titles):
+    """우리 축제명 <-> TourAPI 축제명. 한쪽이 다른 쪽을 품으면 채택."""
+    a = norm(fes_name)
+    best = None
+    for t, item in api_titles:
+        b = norm(t)
+        if a and b and (a in b or b in a):
+            score = min(len(a), len(b)) / max(len(a), len(b))
+            if not best or score > best[0]:
+                best = (score, t, item)
+    if best:
+        return best[1], best[2]
+    # 부분 일치: 핵심 조각을 모두 품고 있으면 인정 (예: '보령 머드축제' <-> '보령머드축제')
+    toks = core_tokens(fes_name)
+    if len(toks) >= 2:
+        for t, item in api_titles:
+            b = norm(t)
+            if all(tok in b for tok in toks):
+                return t, item
+    return None, None
+
+
+def main():
+    key = load_key()
+    if not key:
+        raise SystemExit(
+            "TOUR_API_KEY가 없습니다.\n"
+            "  1) https://www.data.go.kr 에서 '한국관광공사_국문 관광정보 서비스' 활용신청\n"
+            "  2) 일반 인증키(Decoding)를 .env.local에 TOUR_API_KEY=키 로 저장\n"
+            "  3) 다시 실행")
+
+    year = time.localtime().tm_year
+    items = []
+    for y in (year, year - 1):        # 올해에 아직 안 올라온 축제는 작년 자료로 채운다
+        print(f"{y}년 축제 조회…")
+        items += fetch_all(key, f"{y}0101")
+
+    api_titles = [(it.get("title", ""), it) for it in items if it.get("title")]
+    print(f"TourAPI 축제 {len(api_titles)}건")
+
+    with open("festivals.json", encoding="utf-8") as f:
+        fes_raw = json.load(f)
+    try:
+        with open("festival_photos.json", encoding="utf-8") as f:
+            photos = json.load(f)
+    except FileNotFoundError:
+        photos = {}
+
+    out, added = {}, 0
+    for fes in fes_raw.get("kr", []):
+        name = fes["name"]
+        title, item = match(name, api_titles)
+        if not item:
+            continue
+        img = item.get("firstimage") or item.get("firstimage2")
+        rec = {"apiTitle": title, "image": img,
+               "start": item.get("eventstartdate"), "end": item.get("eventenddate"),
+               "addr": item.get("addr1")}
+        out[name] = rec
+        if img and not photos.get(name, {}).get("url"):
+            photos[name] = {"region": fes["region"], "lang": "ko",
+                            "page": f"TourAPI:{title}", "file": os.path.basename(
+                                urllib.parse.urlparse(img).path),
+                            "url": img, "author": "한국관광공사",
+                            "license": "공공누리 (출처표시)"}
+            added += 1
+
+    with open("tourapi_festivals.json", "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    with open("festival_photos.json", "w", encoding="utf-8") as f:
+        json.dump(photos, f, ensure_ascii=False, indent=1)
+
+    matched = len(out)
+    withimg = sum(1 for v in out.values() if v.get("image"))
+    total = len(fes_raw.get("kr", []))
+    have = sum(1 for v in photos.values() if v.get("url"))
+    print(f"\n매칭 {matched}/{total}건, 그중 사진 있는 것 {withimg}건")
+    print(f"새로 채운 사진 {added}건 -> 전체 사진 {have}건")
+    print("다음: python download_festival_photos.py && python build_page.py")
+
+
+if __name__ == "__main__":
+    main()
