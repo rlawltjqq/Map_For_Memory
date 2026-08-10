@@ -1,0 +1,83 @@
+name: 축제 정보 갱신
+
+# 축제 일정과 사진은 해마다 바뀐다. 연 1회(1월 5일) 자동 갱신하고,
+# 필요할 때 수동으로도 돌릴 수 있게 workflow_dispatch를 열어둔다.
+on:
+  schedule:
+    - cron: "0 18 4 1 *"      # 매년 1월 5일 03:00 KST (UTC 기준 1월 4일 18:00)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 의존성 설치
+        run: pip install pillow
+
+      - name: TourAPI에서 축제 일정·사진 받기
+        env:
+          TOUR_API_KEY: ${{ secrets.TOUR_API_KEY }}
+        run: python fetch_tourapi_photos.py
+
+      - name: 사진 내려받기
+        run: python download_festival_photos.py
+
+      - name: 큰 사진 줄이기
+        run: |
+          python - <<'PY'
+          import os
+          from PIL import Image
+          D, MAXW, LIMIT = "festival_photos", 480, 150 * 1024
+          for f in sorted(os.listdir(D)):
+              p = os.path.join(D, f)
+              if os.path.getsize(p) <= LIMIT:
+                  continue
+              im = Image.open(p)
+              w, h = im.size
+              if w > MAXW:
+                  im = im.resize((MAXW, round(h * MAXW / w)), Image.LANCZOS)
+              im.save(p, quality=82, optimize=True)
+              print(f"{f}: {os.path.getsize(p)//1024}KB")
+          PY
+
+      - name: 페이지 빌드
+        run: python build_page.py
+
+      - name: 바뀐 내용 확인
+        id: diff
+        run: |
+          git add -A
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "바뀐 내용 없음"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git diff --cached --stat
+          fi
+
+      - name: 커밋 및 푸시
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "축제 일정·사진 자동 갱신 (TourAPI)"
+          git push
+
+      # Vercel 프로젝트가 깃에 연결돼 있지 않아 푸시만으로는 배포되지 않는다.
+      # VERCEL_TOKEN 시크릿이 있으면 여기서 배포하고, 없으면 조용히 건너뛴다.
+      - name: 배포
+        if: steps.diff.outputs.changed == 'true' && secrets.VERCEL_TOKEN != ''
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: npx --yes vercel@latest deploy --prod --yes --token "$VERCEL_TOKEN"

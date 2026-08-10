@@ -760,6 +760,7 @@ let photos = {};   // code -> [{url, name, vid}]
 let notes = {};    // code -> {visits:[...]}
 let selected = null;
 let pollTimer = null;
+let appliedStateFingerprint = "";
 
 // 접속한 적 있는 지도 목록: {id: {name, token}}
 const savedRooms = JSON.parse(localStorage.getItem("travelRooms") || "{}");
@@ -821,17 +822,61 @@ function cacheState(id, s) {
 function loadCachedState(id) {
   try { return JSON.parse(localStorage.getItem("state:" + id) || "null"); } catch { return null; }
 }
+function canonicalize(value) {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value && typeof value === "object") {
+    return Object.keys(value).sort().reduce((out, key) => {
+      out[key] = canonicalize(value[key]);
+      return out;
+    }, {});
+  }
+  return value;
+}
+function stateFingerprint(name, visitedValue, photosValue, notesValue) {
+  return JSON.stringify(canonicalize({
+    name: name || "",
+    visited: [...visitedValue].map(String).sort(),
+    photos: photosValue || {},
+    notes: notesValue || {},
+  }));
+}
 async function enterRoom(id) {
   ROOM = id;
   TOKEN = savedRooms[id] ? savedRooms[id].token : null;
+  appliedStateFingerprint = "";
+  resetThumbnailQueue();
+  const cached = loadCachedState(id);
+  let startedFromCache = false;
+  if (cached) {
+    startApp(cached, false);
+    setBadge(false, "동기화 중…");
+    startedFromCache = true;
+  }
   try {
     const s = await api(`/api/state?room=${id}`);
+    if (ROOM !== id) return;
     cacheState(id, s);
-    startApp(s);
+    if (startedFromCache) {
+      $("roomName").textContent = s.name;
+      rememberRoom(id, s.name, TOKEN);
+      applyState(s);
+      migrateMergedCodes().catch(() => {});
+      setBadge(true);
+      updateLabels();
+    } else {
+      startApp(s);
+    }
   } catch (e) {
-    if (e.status === 403 || e.status === 404) { showJoin(id); return; }
+    if (e.status === 403 || e.status === 404) {
+      if (startedFromCache) showLanding();
+      showJoin(id);
+      return;
+    }
     // 네트워크 실패: 캐시된 상태가 있으면 오프라인 보기 모드로 진입
-    const cached = loadCachedState(id);
+    if (startedFromCache) {
+      setBadge(false, "오프라인 (보기 전용)");
+      return;
+    }
     if (cached) {
       startApp(cached);
       setBadge(false, "오프라인 (보기 전용)");
@@ -855,6 +900,7 @@ function showJoin(id) {
       rememberRoom(id, j.name, j.token);
       $("joinModal").style.display = "none";
       const s = await api(`/api/state?room=${id}`);
+      cacheState(id, s);
       startApp(s);
     } catch (e) {
       $("joinErr").textContent = e.message === "Failed to fetch" ? "서버 연결 실패" : e.message;
@@ -862,7 +908,7 @@ function showJoin(id) {
   };
   $("joinPw").onkeydown = e => { if (e.key === "Enter") $("joinBtn").click(); };
 }
-function startApp(state) {
+function startApp(state, runMigrations = true) {
   $("landing").style.display = "none";
   $("app").style.display = "flex";
   $("roomName").textContent = state.name;
@@ -870,7 +916,7 @@ function startApp(state) {
   applyState(state);
   // 통합된 옛 코드의 방문·메모·사진을 새 코드로 이관 (있을 때만).
   // 비동기라 실패해도 앱 시작은 계속되게 둔다.
-  migrateMergedCodes().catch(() => {});
+  if (runMigrations) migrateMergedCodes().catch(() => {});
   setBadge(true);
   updateLabels();
   maybeShowFirstHint();
@@ -965,13 +1011,18 @@ function applyState(s) {
     if (notes[code]) inNotes[code] = notes[code]; else delete inNotes[code];
     if (photos[code]) inPhotos[code] = photos[code]; else delete inPhotos[code];
   });
+  const fingerprint = stateFingerprint(s.name, inVisited, inPhotos, inNotes);
+  const changed = fingerprint !== appliedStateFingerprint;
   visited = inVisited;
   photos = inPhotos;
   notes = inNotes;
+  appliedStateFingerprint = fingerprint;
+  if (!changed) return false;
   paintVisited();
   render();
   renderFeed();
   if (selected) renderPanel();
+  return true;
 }
 async function refresh() {
   // 저장 중이거나 방금 저장했으면 건너뜀 (서버 응답이 뒤늦게 와서 로컬 편집을 지우는 것 방지)
@@ -982,9 +1033,9 @@ async function refresh() {
   try {
     const s = await api(`/api/state?room=${ROOM}`);
     cacheState(ROOM, s);
-    applyState(s);
+    const changed = applyState(s);
     setBadge(true);
-    updateLabels();
+    if (changed) updateLabels();
   } catch { setBadge(false, navigator.onLine ? "연결 끊김" : "오프라인 (보기 전용)"); }
 }
 
@@ -1876,24 +1927,106 @@ function dismissFirstHint() {
   }
 }
 
-// 사진 압축: 긴 변 1600px, JPEG 품질 0.85 (Vercel 요청 크기 제한 대응 + 저장 용량 절약)
-async function compressImage(file, max = 1600, quality = 0.85) {
-  if (!/^image\//.test(file.type)) return { blob: file, name: file.name };
+// 사진 압축: 원본은 1600px JPEG, 목록용은 더 작은 WebP로 저장한다.
+async function compressImage(file, max = 1600, quality = 0.85, outputType = "image/jpeg") {
+  const sourceName = file.name || "photo";
+  if (!/^image\//.test(file.type) && file.type !== "application/octet-stream") {
+    return { blob: file, name: sourceName };
+  }
   const img = await createImageBitmap(file).catch(() => null);
-  if (!img) return { blob: file, name: file.name };
+  if (!img) return { blob: file, name: sourceName };
   const k = Math.min(1, max / Math.max(img.width, img.height));
-  if (k === 1 && file.size < 2 * 1024 * 1024 && max >= 1600) return { blob: file, name: file.name };
+  if (k === 1 && file.size < 2 * 1024 * 1024 && max >= 1600) {
+    img.close?.();
+    return { blob: file, name: sourceName };
+  }
   const c = document.createElement("canvas");
   c.width = Math.round(img.width * k);
   c.height = Math.round(img.height * k);
   c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
-  const blob = await new Promise(r => c.toBlob(r, "image/jpeg", quality));
-  if (!blob) return { blob: file, name: file.name };
-  return { blob, name: file.name.replace(/\.\w+$/, "") + ".jpg" };
+  img.close?.();
+  const blob = await new Promise(r => c.toBlob(r, outputType, quality));
+  if (!blob) return { blob: file, name: sourceName };
+  const ext = outputType === "image/webp" ? ".webp" : ".jpg";
+  return { blob, name: sourceName.replace(/\.\w+$/, "") + ext };
 }
 // 목록에 쓸 작은 사진. 앨범 칸은 60px 남짓인데 원본(1600px)을 내려받으면
 // 사진 한 장에 수백 KB가 들어 모바일에서 한참 걸린다.
 const thumbOf = p => p.thumb || p.url;
+
+// 썸네일 기능 도입 전에 올린 사진은 원본이 한 번 표시된 뒤, 유휴 시간에 작은 썸네일을 만든다.
+// 실제로 화면에 나타난 사진만 한 장씩 처리해 첫 화면 네트워크를 방해하지 않는다.
+const thumbnailQueue = [];
+const queuedThumbnailUrls = new Set();
+let thumbnailWorkerRunning = false;
+function resetThumbnailQueue() {
+  thumbnailQueue.length = 0;
+  queuedThumbnailUrls.clear();
+}
+function findPhotoRecord(url) {
+  for (const [code, list] of Object.entries(photos)) {
+    const photo = (list || []).find(p => p.url === url);
+    if (photo) return { code, photo };
+  }
+  return null;
+}
+function waitForIdle() {
+  return new Promise(resolve => {
+    if ("requestIdleCallback" in window) requestIdleCallback(() => resolve(), { timeout: 1500 });
+    else setTimeout(resolve, 200);
+  });
+}
+function queueMissingThumbnail(url) {
+  const found = findPhotoRecord(url);
+  if (!ROOM || !navigator.onLine || !found || found.photo.thumb || queuedThumbnailUrls.has(url)) return;
+  queuedThumbnailUrls.add(url);
+  thumbnailQueue.push({ room: ROOM, code: found.code, url });
+  processThumbnailQueue();
+}
+async function processThumbnailQueue() {
+  if (thumbnailWorkerRunning) return;
+  thumbnailWorkerRunning = true;
+  while (thumbnailQueue.length) {
+    const job = thumbnailQueue.shift();
+    try {
+      if (job.room !== ROOM) continue;
+      await waitForIdle();
+      if (job.room !== ROOM) continue;
+      const current = findPhotoRecord(job.url);
+      if (!current || current.photo.thumb) continue;
+      const response = await fetch(job.url, { cache: "force-cache" });
+      if (!response.ok) continue;
+      const source = await response.blob();
+      if (!/^image\//.test(source.type) && source.type !== "application/octet-stream") continue;
+      const t = await compressImage(source, 240, 0.68, "image/webp");
+      if (job.room !== ROOM) continue;
+      markDirty(job.code);
+      const saved = await api(`/api/photo?room=${job.room}&code=${job.code}&thumbfor=${encodeURIComponent(job.url)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/octet-stream", "X-Filename": encodeURIComponent(t.name) },
+        body: t.blob
+      });
+      const live = findPhotoRecord(job.url);
+      if (!live) continue;
+      live.photo.thumb = saved.thumb;
+      document.querySelectorAll("img[data-full]").forEach(img => {
+        if (img.dataset.full === job.url) img.src = saved.thumb;
+      });
+      cacheState(ROOM, { name: $("roomName").textContent, visited: [...visited], photos, notes });
+    } catch {
+      // 원본 CORS나 일시적인 네트워크 오류가 있으면 원본 표시를 유지한다.
+    } finally {
+      queuedThumbnailUrls.delete(job.url);
+    }
+  }
+  thumbnailWorkerRunning = false;
+}
+document.addEventListener("load", e => {
+  const img = e.target;
+  if (!(img instanceof HTMLImageElement) || !img.dataset.full) return;
+  if (img.getAttribute("src") === img.dataset.full) queueMissingThumbnail(img.dataset.full);
+}, true);
+
 $("photoInput").addEventListener("change", async e => {
   if (!selected) { e.target.value = ""; return; }
   const code = selected, vid = pendingVid;
@@ -1913,7 +2046,7 @@ $("photoInput").addEventListener("change", async e => {
       (photos[code] = photos[code] || []).push(entry);
       // 목록용 작은 사진은 실패해도 원본으로 대체되므로 조용히 넘어간다
       try {
-        const t = await compressImage(files[i], 400, 0.7);
+        const t = await compressImage(files[i], 240, 0.68, "image/webp");
         const r = await api(`/api/photo?room=${ROOM}&code=${code}&thumbfor=${encodeURIComponent(j.url)}`, {
           method: "POST",
           headers: { "Content-Type": "application/octet-stream", "X-Filename": encodeURIComponent(t.name) },
