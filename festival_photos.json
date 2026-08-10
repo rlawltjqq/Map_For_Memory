@@ -15,7 +15,8 @@
   "page": null,
   "url": null,
   "file": null,
-  "tried2": true
+  "tried2": true,
+  "dropped": "TourAPI 오매칭(안성 동막골 빙어축제)"
  },
  "태백산 눈축제": {
   "region": "태백시",
@@ -37,10 +38,11 @@
  "울진 대게와 붉은대게축제": {
   "region": "울진군",
   "lang": "ko",
-  "page": null,
-  "url": null,
-  "file": null,
-  "tried2": true
+  "page": "TourAPI:울진대게와 붉은대게 축제",
+  "file": "4012128_image2_1.jpg",
+  "url": "https://tong.visitkorea.or.kr/cms/resource/28/4012128_image2_1.jpg",
+  "author": "한국관광공사",
+  "license": "공공누리 (출처표시)"
  },
  "광양 매화축제": {
   "region": "광양시",
@@ -53,10 +55,11 @@
  "구례 산수유꽃축제": {
   "region": "구례군",
   "lang": "ko",
-  "page": null,
-  "url": null,
-  "file": null,
-  "tried2": true
+  "page": "TourAPI:구례산수유꽃축제",
+  "file": "4020643_image2_1.jpg",
+  "url": "https://tong.visitkorea.or.kr/cms/resource/43/4020643_image2_1.jpg",
+  "author": "한국관광공사",
+  "license": "공공누리 (출처표시)"
  },
  "제주 들불축제": {
   "region": "제주시",
@@ -106,10 +109,11 @@
  "고창 청보리밭축제": {
   "region": "고창군",
   "lang": "ko",
-  "page": null,
-  "url": null,
-  "file": null,
-  "tried2": true
+  "page": "TourAPI:고창청보리밭 축제",
+  "file": "4072004_image2_1.jpg",
+  "url": "https://tong.visitkorea.or.kr/cms/resource/04/4072004_image2_1.jpg",
+  "author": "한국관광공사",
+  "license": "공공누리 (출처표시)"
  },
  "함평 나비대축제": {
   "region": "함평군",
@@ -123,18 +127,20 @@
  "담양 대나무축제": {
   "region": "담양군",
   "lang": "ko",
-  "page": null,
-  "url": null,
-  "file": null,
-  "tried2": true
+  "page": "TourAPI:담양 대나무축제",
+  "file": "4041244_image2_1.jpg",
+  "url": "https://tong.visitkorea.or.kr/cms/resource/44/4041244_image2_1.jpg",
+  "author": "한국관광공사",
+  "license": "공공누리 (출처표시)"
  },
  "보성 다향대축제": {
   "region": "보성군",
   "lang": "ko",
-  "page": null,
-  "url": null,
-  "file": null,
-  "tried2": true
+  "page": "TourAPI:보성다향대축제",
+  "file": "4058829_image2_1.JPG",
+  "url": "https://tong.visitkorea.or.kr/cms/resource/29/4058829_image2_1.JPG",
+  "author": "한국관광공사",
+  "license": "공공누리 (출처표시)"
  },
  "남원 춘향제": {
   "region": "남원시",
@@ -158,18 +164,20 @@
  "하동 야생차문화축제": {
   "region": "하동군",
   "lang": "ko",
-  "page": null,
-  "url": null,
-  "file": null,
-  "tried2": true
+  "page": "TourAPI:하동야생차문화축제",
+  "file": "4059313_image2_1.jpg",
+  "url": "https://tong.visitkorea.or.kr/cms/resource/13/4059313_image2_1.jpg",
+  "author": "한국관광공사",
+  "license": "공공누리 (출처표시)"
  },
  "여수 거북선축제": {
   "region": "여수시",
   "lang": "ko",
-  "page": null,
-  "url": null,
-  "file": null,
-  "tried2": true
+  "page": "TourAPI:여수거북선축제",
+  "file": "4060110_image2_1.jpg",
+  "url": "https://tong.visitkorea.or.kr/cms/resource/10/4060110_image2_1.jpg",
+  "author": "한국관광공사",
+  "license": "공공누리 (출처표시)"
  },
  "강릉 단오제": {
   "region": "강릉시",
@@ -192,27 +200,29 @@
  "대구 치맥페스티벌": {
   "region": "달서구",
   "lang": "ko",
-  "page": null,
-  "url": null,
-  "file": null,
-  "tried2": true,
-  "dropped": "어느 축제인지 불명확"
+  "page": "TourAPI:대구치맥페스티벌",
+  "file": "4071284_image2_1.jpg",
+  "url": "https://tong.visitkorea.or.kr/cms/resource/84/4071284_image2_1.jpg",
+  "author": "한국관광공사",
+  "license": "공공누리 (출처표시)"
  },
  "정남진 장흥 물축제": {
   "region": "장흥군",
   "lang": "ko",
-  "page": null,
-  "url": null,
-  "file": null,
-  "tried2": true
+  "page": "TourAPI:정남진 장흥 물축제",
+  "file": "4071277_image2_1.jpg",
+  "url": "https://tong.visitkorea.or.kr/cms/resource/77/4071277_image2_1.jpg",
+  "author": "한국관광공사",
+  "license": "공공누리 (출처표시)"
  },
  "봉화 은어축제": {
   "region": "봉화군",
   "lang": "ko",
-  "page": null,
-  "url": null,
-  "file": null,
-  "tried2": true
+  "page": "TourAPI:봉화은어축제",
+  "file": "4080830_image2_1.JPG",
+  "url": "https://tong.visitkorea.or.kr/cms/resource/30/4080830_image2_1.JPG",
+  "author": "한국관광공사",
+  "license": "공공누리 (출처표시)"
  },
  "평창 대관령음악제": {
   "region": "평창군",
@@ -245,10 +255,11 @@
  "무주 반딧불축제": {
   "region": "무주군",
   "lang": "ko",
-  "page": null,
-  "url": null,
-  "file": null,
-  "tried2": true
+  "page": "TourAPI:무주반딧불축제",
+  "file": "3520566_image2_1.JPG",
+  "url": "https://tong.visitkorea.or.kr/cms/resource/66/3520566_image2_1.JPG",
+  "author": "한국관광공사",
+  "license": "공공누리 (출처표시)"
  },
  "제천 국제음악영화제": {
   "region": "제천시",
@@ -280,18 +291,20 @@
  "산청 한방약초축제": {
   "region": "산청군",
   "lang": "ko",
-  "page": null,
-  "url": null,
-  "file": null,
-  "tried2": true
+  "page": "TourAPI:산청한방약초축제",
+  "file": "3523088_image2_1.JPG",
+  "url": "https://tong.visitkorea.or.kr/cms/resource/88/3523088_image2_1.JPG",
+  "author": "한국관광공사",
+  "license": "공공누리 (출처표시)"
  },
  "김제 지평선축제": {
   "region": "김제시",
   "lang": "ko",
-  "page": null,
-  "url": null,
-  "file": null,
-  "tried2": true
+  "page": "TourAPI:김제지평선축제",
+  "file": "3516354_image2_1.jpg",
+  "url": "https://tong.visitkorea.or.kr/cms/resource/54/3516354_image2_1.jpg",
+  "author": "한국관광공사",
+  "license": "공공누리 (출처표시)"
  },
  "안성 바우덕이축제": {
   "region": "안성시",
@@ -304,10 +317,11 @@
  "영동 난계국악축제": {
   "region": "영동군",
   "lang": "ko",
-  "page": null,
-  "url": null,
-  "file": null,
-  "tried2": true
+  "page": "TourAPI:영동난계국악축제",
+  "file": "4058672_image2_1.jpg",
+  "url": "https://tong.visitkorea.or.kr/cms/resource/72/4058672_image2_1.jpg",
+  "author": "한국관광공사",
+  "license": "공공누리 (출처표시)"
  },
  "진주 남강유등축제": {
   "region": "진주시",
@@ -356,18 +370,20 @@
  "논산 강경젓갈축제": {
   "region": "논산시",
   "lang": "ko",
-  "page": null,
-  "url": null,
-  "file": null,
-  "tried2": true
+  "page": "TourAPI:강경젓갈축제",
+  "file": "3538099_image2_1.jpg",
+  "url": "http://tong.visitkorea.or.kr/cms/resource/99/3538099_image2_1.jpg",
+  "author": "한국관광공사",
+  "license": "공공누리 (출처표시)"
  },
  "서산 해미읍성축제": {
   "region": "서산시",
   "lang": "ko",
-  "page": null,
-  "url": null,
-  "file": null,
-  "tried2": true
+  "page": "TourAPI:서산해미읍성축제",
+  "file": "3550747_image2_1.jpg",
+  "url": "https://tong.visitkorea.or.kr/cms/resource/47/3550747_image2_1.jpg",
+  "author": "한국관광공사",
+  "license": "공공누리 (출처표시)"
  },
  "순천만 갈대축제": {
   "region": "순천시",

@@ -94,7 +94,7 @@ def core_tokens(name):
     return [t for t in re.split(r"(축제|페스티벌|제)", n) if len(t) >= 2]
 
 
-def match(fes_name, api_titles):
+def match(fes_name, api_titles, region=""):
     """우리 축제명 <-> TourAPI 축제명. 한쪽이 다른 쪽을 품으면 채택."""
     a = norm(fes_name)
     best = None
@@ -106,13 +106,19 @@ def match(fes_name, api_titles):
                 best = (score, t, item)
     if best:
         return best[1], best[2]
-    # 부분 일치: 핵심 조각을 모두 품고 있으면 인정 (예: '보령 머드축제' <-> '보령머드축제')
-    toks = core_tokens(fes_name)
-    if len(toks) >= 2:
-        for t, item in api_titles:
-            b = norm(t)
-            if all(tok in b for tok in toks):
-                return t, item
+    # 부분 일치는 지역명이 함께 있을 때만 인정한다.
+    # '인제 빙어축제'는 '제'가 잘려나가 '빙어축제'만 남는 바람에
+    # 안성 동막골 빙어축제에 붙은 적이 있다.
+    place = re.sub(r"(특별자치)?(시|군|구|도)$", "", region or "")
+    if not place or len(place) < 2:
+        return None, None
+    toks = [t for t in core_tokens(fes_name) if t not in ("축제", "페스티벌")]
+    if not toks:
+        return None, None
+    for t, item in api_titles:
+        b = norm(t)
+        if place in b and all(tok in b for tok in toks):
+            return t, item
     return None, None
 
 
@@ -145,7 +151,7 @@ def main():
     out, added = {}, 0
     for fes in fes_raw.get("kr", []):
         name = fes["name"]
-        title, item = match(name, api_titles)
+        title, item = match(name, api_titles, fes.get("region", ""))
         if not item:
             continue
         img = item.get("firstimage") or item.get("firstimage2")
