@@ -1696,6 +1696,20 @@ function renderRecs() {
   renderFestivals();
 }
 
+// 축제 기간 표시 — 실제 일정이 있으면 날짜로, 없으면 달로.
+// 해마다 일정이 바뀌므로 지난해 자료는 연도를 붙여 지난 일정임을 밝힌다.
+function festivalWhen(f) {
+  const span = f.m.length > 1 ? `${f.m[0]}~${f.m[f.m.length - 1]}월` : `${f.m[0]}월`;
+  if (!f.s || !f.e) return span;
+  const y = +f.s.slice(0, 4), m1 = +f.s.slice(4, 6), d1 = +f.s.slice(6, 8);
+  const m2 = +f.e.slice(4, 6), d2 = +f.e.slice(6, 8);
+  const body = m1 === m2
+    ? (d1 === d2 ? `${m1}.${d1}` : `${m1}.${d1}~${d2}`)
+    : `${m1}.${d1}~${m2}.${d2}`;
+  const thisYear = new Date().getFullYear();
+  return y < thisYear ? `${y}년 ${body}` : body;
+}
+
 // 이달의 축제 — 매년 반복되는 행사라 '달'로만 다룬다 (정확한 일정은 해마다 바뀜)
 function renderFestivals() {
   const list = $("fesList"), note = $("fesNote"), head = $("fesHead");
@@ -1705,11 +1719,14 @@ function renderFestivals() {
                                      && nameByCode[f.c]);
   head.textContent = `${m}월의 축제`;
   const cName = COUNTRY === "jp" ? "일본" : "한국";
+  const dated = rows.filter(f => f.s).length;
   note.textContent = rows.length
-    ? "해마다 열리는 대표 축제입니다. 정확한 일정은 해마다 달라지니 확인 후 방문하세요."
+    ? (dated
+        ? `날짜는 한국관광공사 자료 기준입니다. 해마다 달라지니 방문 전 확인하세요.`
+        : "해마다 열리는 대표 축제입니다. 정확한 일정은 해마다 달라지니 확인 후 방문하세요.")
     : `${m}월에 등록된 ${cName} 축제가 없습니다.`;
   list.innerHTML = rows.map(f => {
-    const span = f.m.length > 1 ? `${f.m[0]}~${f.m[f.m.length - 1]}월` : `${f.m[0]}월`;
+    const span = festivalWhen(f);
     // 사진이 있으면 왼쪽에, 없으면 태그 배지로 (사진은 절반 정도만 있다)
     const lead = f.p
       ? `<img class="fes-photo" src="${f.p}" alt="" loading="lazy" decoding="async"

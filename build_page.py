@@ -84,6 +84,8 @@ def resolve_festivals():
             code = resolve_region(fes, f'축제 {fes["name"]}')
             item = {"n": fes["name"], "c": code, "m": fes["months"],
                     "t": fes["tag"], "d": fes["desc"]}
+            if fes.get("start") and fes.get("end"):
+                item["s"], item["e"] = fes["start"], fes["end"]   # 실제 개최 일정
             ph = photos.get(fes["name"])
             if ph and os.path.exists(os.path.join("festival_photos", ph["file"])):
                 # 위키미디어 사진은 대개 저작자 표기가 필요해 출처를 함께 싣는다
