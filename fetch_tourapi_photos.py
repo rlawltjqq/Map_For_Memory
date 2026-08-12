@@ -50,16 +50,20 @@ def fetch_page(base, op, key, start_date, page, rows=100):
         "numOfRows": rows, "pageNo": page, "arrange": "A",
     }, safe="%")           # 인증키에 이미 %가 들어있을 수 있어 다시 인코딩하지 않는다
     req = urllib.request.Request(f"{base}/{op}?{qs}", headers=UA)
-    # 해외(GitHub 러너)에서 data.go.kr 응답이 느려 자주 끊긴다. 넉넉히 기다리고 재시도한다.
+    # data.go.kr은 해외(GitHub 러너)에서 연결 자체가 자주 끊긴다. 간헐적이라
+    # 오래 붙들고 여러 번 시도하면 대개 뚫린다. 연 1회 작업이라 기다려도 된다.
     last = None
-    for attempt in range(4):
+    for attempt in range(8):
         try:
-            with urllib.request.urlopen(req, timeout=150) as r:
+            with urllib.request.urlopen(req, timeout=120) as r:
                 raw = r.read().decode("utf-8", "replace")
             break
         except Exception as e:
             last = e
-            time.sleep(10 * (attempt + 1))
+            if attempt < 7:
+                wait = min(60, 10 * (attempt + 1))
+                print(f"    연결 재시도 {attempt + 1}/8 ({wait}초 대기)")
+                time.sleep(wait)
     else:
         raise RuntimeError(f"연결 실패: {last}")
     if raw.lstrip().startswith("<"):        # 오류는 XML로 온다
