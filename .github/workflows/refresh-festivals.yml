@@ -13,6 +13,9 @@ permissions:
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    # secrets는 스텝의 if에서 못 읽는다. 잡 레벨 env로 올려야 조건에 쓸 수 있다.
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -72,12 +75,11 @@ jobs:
           git commit -m "축제 일정·사진 자동 갱신 (TourAPI)"
           git push
 
-      # Vercel 프로젝트가 깃에 연결돼 있지 않아 푸시만으로는 배포되지 않는다.
-      # VERCEL_TOKEN 시크릿이 있으면 여기서 배포하고, 없으면 조용히 건너뛴다.
-      - name: 배포
-        if: steps.diff.outputs.changed == 'true' && secrets.VERCEL_TOKEN != ''
+      # Vercel이 이 저장소에 연결돼 있어 위 푸시만으로 배포가 이어진다.
+      # 연결이 끊겼을 때를 대비해, VERCEL_TOKEN 시크릿이 있으면 CLI로도 배포한다.
+      - name: 배포 (연결이 끊겼을 때만)
+        if: steps.diff.outputs.changed == 'true' && env.VERCEL_TOKEN != ''
         env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: npx --yes vercel@latest deploy --prod --yes --token "$VERCEL_TOKEN"
