@@ -21,20 +21,23 @@ with open("japan_map.svg", encoding="utf-8") as f:
 with open("japan_meta.json", encoding="utf-8") as f:
     jp_meta = json.load(f)
 
-with open("korea_provinces.geojson", encoding="utf-8") as f:
-    prov_gj = json.load(f)
-prov_names = {}
-for feat in prov_gj["features"]:
-    p = feat["properties"]
-    prov_names[p["code"]] = p["name"]
-
-# 짧은 표시용 이름
+# 시도 코드 -> 짧은 이름. 원본 geojson은 대용량이라 저장소에 없으므로(자동 갱신
+# 워크플로에서도 빌드해야 한다) 뽑아둔 작은 파일을 쓰고, 없을 때만 원본에서 만든다.
 short = {"서울특별시": "서울", "부산광역시": "부산", "대구광역시": "대구", "인천광역시": "인천",
          "광주광역시": "광주", "대전광역시": "대전", "울산광역시": "울산", "세종특별자치시": "세종",
          "경기도": "경기", "강원도": "강원", "충청북도": "충북", "충청남도": "충남",
          "전라북도": "전북", "전라남도": "전남", "경상북도": "경북", "경상남도": "경남",
          "제주특별자치도": "제주"}
-prov_short = {code: short.get(name, name) for code, name in prov_names.items()}
+try:
+    with open("prov_short.json", encoding="utf-8") as f:
+        prov_short = json.load(f)
+except FileNotFoundError:
+    with open("korea_provinces.geojson", encoding="utf-8") as f:
+        prov_gj = json.load(f)
+    prov_short = {p["code"]: short.get(p["name"], p["name"])
+                  for p in (feat["properties"] for feat in prov_gj["features"])}
+    with open("prov_short.json", "w", encoding="utf-8") as f:
+        json.dump(prov_short, f, ensure_ascii=False, indent=1)
 
 with open("page_template.html", encoding="utf-8") as f:
     html = f.read()
