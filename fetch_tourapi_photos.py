@@ -50,8 +50,18 @@ def fetch_page(base, op, key, start_date, page, rows=100):
         "numOfRows": rows, "pageNo": page, "arrange": "A",
     }, safe="%")           # 인증키에 이미 %가 들어있을 수 있어 다시 인코딩하지 않는다
     req = urllib.request.Request(f"{base}/{op}?{qs}", headers=UA)
-    with urllib.request.urlopen(req, timeout=60) as r:
-        raw = r.read().decode("utf-8", "replace")
+    # 해외(GitHub 러너)에서 data.go.kr 응답이 느려 자주 끊긴다. 넉넉히 기다리고 재시도한다.
+    last = None
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(req, timeout=150) as r:
+                raw = r.read().decode("utf-8", "replace")
+            break
+        except Exception as e:
+            last = e
+            time.sleep(10 * (attempt + 1))
+    else:
+        raise RuntimeError(f"연결 실패: {last}")
     if raw.lstrip().startswith("<"):        # 오류는 XML로 온다
         msg = re.search(r"<returnAuthMsg>([^<]*)", raw) or re.search(r"<errMsg>([^<]*)", raw)
         raise RuntimeError(f"API 오류: {msg.group(1) if msg else raw[:160]}")
