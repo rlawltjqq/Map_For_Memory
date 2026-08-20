@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """korea_sigungu_map.svg + 시도 정보 -> index.html (여행 지도 웹페이지)"""
+import hashlib
 import json
 import re
 
@@ -140,9 +141,32 @@ html = html.replace("__TRENDING_AT__", json.dumps(trending_at, ensure_ascii=Fals
 html = html.replace("__PROV__", json.dumps(prov_short, ensure_ascii=False))
 html = html.replace("__PROV_JP__", json.dumps(jp_meta["regions"], ensure_ascii=False))
 html = html.replace("__EMBLEMS__", json.dumps(emblems, ensure_ascii=False))
-html = html.replace("__SVG__", svg)
-html = html.replace("__SVG_JP__", svg_jp)
+# 지도 SVG와 앱 스크립트는 따로 낸다.
+# HTML은 network-first(sw.js)라 인라인이면 열 때마다 387KB를 다시 받는다.
+# 별도 파일이면 캐시에 남아 재방문 때 내려받지 않는다.
+with open("map_kr.svg", "w", encoding="utf-8") as f:
+    f.write(svg)
+with open("map_jp.svg", "w", encoding="utf-8") as f:
+    f.write(svg_jp)
+
+with open("app_body.tmp", encoding="utf-8") as f:
+    app_js = f.read()
+app_js = (app_js.replace("__PROV__", json.dumps(prov_short, ensure_ascii=False))
+                .replace("__PROV_JP__", json.dumps(jp_meta["regions"], ensure_ascii=False))
+                .replace("__EMBLEMS__", json.dumps(emblems, ensure_ascii=False))
+                .replace("__CLIMATE__", json.dumps(climate, separators=(",", ":")))
+                .replace("__FESTIVALS__", json.dumps(festivals, ensure_ascii=False, separators=(",", ":")))
+                .replace("__TRENDING__", json.dumps(trending, ensure_ascii=False, separators=(",", ":")))
+                .replace("__TRENDING_AT__", json.dumps(trending_at, ensure_ascii=False)))
+with open("app.js", "w", encoding="utf-8") as f:
+    f.write(app_js)
+
+# 캐시를 확실히 갈아끼우도록 파일 내용으로 빌드 번호를 만든다
+build_id = hashlib.sha256((app_js + svg + svg_jp).encode()).hexdigest()[:8]
+html = html.replace("__BUILD__", build_id)
 
 with open("index.html", "w", encoding="utf-8") as f:
     f.write(html)
-print(f"index.html written, {len(html)} bytes (미사용 심벌 {dropped}개 제외)")
+print(f"index.html {len(html)//1024}KB / app.js {len(app_js)//1024}KB / "
+      f"map_kr.svg {len(svg)//1024}KB / map_jp.svg {len(svg_jp)//1024}KB "
+      f"(build {build_id}, 미사용 심벌 {dropped}개 제외)")

@@ -1,5 +1,5 @@
 // 오프라인 지원 — 앱 껍데기(HTML/아이콘/심벌)는 캐시, 데이터(API)는 항상 네트워크
-const VERSION = "v3";
+const VERSION = "v4";
 const SHELL = `shell-${VERSION}`;
 const ASSETS = `assets-${VERSION}`;
 
@@ -51,8 +51,14 @@ self.addEventListener("fetch", (e) => {
     return;
   }
 
-  // 그 외 동일 출처 정적 파일: 캐시 우선
+  // 그 외 동일 출처 정적 파일(app.js, 지도 SVG, 축제 사진 등): 캐시 우선 + 캐시에 저장.
+  // 저장하지 않으면 캐시에 들어갈 일이 없어 매번 네트워크에서 받게 된다.
   if (url.origin === location.origin) {
-    e.respondWith(caches.match(req).then((hit) => hit || fetch(req)));
+    e.respondWith(
+      caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+        if (res.ok) { const copy = res.clone(); caches.open(ASSETS).then((c) => c.put(req, copy)); }
+        return res;
+      }))
+    );
   }
 });
