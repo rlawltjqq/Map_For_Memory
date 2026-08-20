@@ -10,6 +10,12 @@ import time
 import urllib.parse
 import urllib.request
 
+import os
+import sys
+
+# 저장소 루트의 지도 생성 모듈을 쓰므로 경로에 넣는다 (tools/ 밖에 있다)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import make_sigungu_map as M
 
 CAND = 9          # 지역당 후보 점 수

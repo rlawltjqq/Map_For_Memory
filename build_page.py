@@ -149,7 +149,7 @@ with open("map_kr.svg", "w", encoding="utf-8") as f:
 with open("map_jp.svg", "w", encoding="utf-8") as f:
     f.write(svg_jp)
 
-with open("app_body.tmp", encoding="utf-8") as f:
+with open("app_template.js", encoding="utf-8") as f:
     app_js = f.read()
 app_js = (app_js.replace("__PROV__", json.dumps(prov_short, ensure_ascii=False))
                 .replace("__PROV_JP__", json.dumps(jp_meta["regions"], ensure_ascii=False))

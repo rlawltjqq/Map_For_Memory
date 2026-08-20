@@ -108,8 +108,14 @@ def core_tokens(name):
     return [t for t in re.split(r"(축제|페스티벌|제)", n) if len(t) >= 2]
 
 
-def match(fes_name, api_titles, region=""):
+def match(fes_name, api_titles, region="", alias=""):
     """우리 축제명 <-> TourAPI 축제명. 한쪽이 다른 쪽을 품으면 채택."""
+    # 공식 명칭이 우리 표기와 아주 다른 축제는 별칭으로 바로 찾는다
+    # (광주 세계김치축제 -> 광주김치축제)
+    if alias:
+        for t, item in api_titles:
+            if t == alias:
+                return t, item
     a = norm(fes_name)
     best = None
     for t, item in api_titles:
@@ -165,7 +171,7 @@ def main():
     out, added = {}, 0
     for fes in fes_raw.get("kr", []):
         name = fes["name"]
-        title, item = match(name, api_titles, fes.get("region", ""))
+        title, item = match(name, api_titles, fes.get("region", ""), fes.get("tour", ""))
         if not item:
             continue
         img = item.get("firstimage") or item.get("firstimage2")

@@ -283,10 +283,11 @@
  "금산 인삼축제": {
   "region": "금산군",
   "lang": "ko",
-  "page": null,
-  "url": null,
-  "file": null,
-  "tried2": true
+  "page": "TourAPI:금산세계인삼축제",
+  "file": "3524159_image2_1.JPG",
+  "url": "https://tong.visitkorea.or.kr/cms/resource/59/3524159_image2_1.JPG",
+  "author": "한국관광공사",
+  "license": "공공누리 (출처표시)"
  },
  "산청 한방약초축제": {
   "region": "산청군",
@@ -309,10 +310,11 @@
  "안성 바우덕이축제": {
   "region": "안성시",
   "lang": "ko",
-  "page": null,
-  "url": null,
-  "file": null,
-  "tried2": true
+  "page": "TourAPI:안성맞춤 남사당 바우덕이축제",
+  "file": "4091593_image2_1.jpg",
+  "url": "https://tong.visitkorea.or.kr/cms/resource/93/4091593_image2_1.jpg",
+  "author": "한국관광공사",
+  "license": "공공누리 (출처표시)"
  },
  "영동 난계국악축제": {
   "region": "영동군",
@@ -396,10 +398,11 @@
  "광주 세계김치축제": {
   "region": "남구",
   "lang": "ko",
-  "page": null,
-  "url": null,
-  "file": null,
-  "tried2": true
+  "page": "TourAPI:광주김치축제",
+  "file": "3545732_image2_1.JPG",
+  "url": "https://tong.visitkorea.or.kr/cms/resource/32/3545732_image2_1.JPG",
+  "author": "한국관광공사",
+  "license": "공공누리 (출처표시)"
  },
  "서울 빛초롱축제": {
   "region": "종로구",

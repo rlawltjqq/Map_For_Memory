@@ -28,13 +28,19 @@ python server.py
 
 | 경로 | 역할 |
 |---|---|
-| `index.html` | 프론트엔드 (빌드 결과물, 지도 SVG 포함) |
+| `page_template.html` / `app_template.js` | 프론트엔드 소스 (**수정은 여기서**) |
+| `index.html` / `app.js` / `map_*.svg` | 빌드 결과물 — 직접 고치지 말 것 |
 | `api/*.js` | Vercel 서버리스 함수 (방 생성/입장, 방문 기록, 사진) |
 | `server.py` | 로컬 개발 서버 — `api/`와 동일한 API를 파일 저장으로 에뮬레이트 |
-| `page_template.html` | 프론트엔드 템플릿 (수정은 여기서) |
-| `make_sigungu_map.py` | GeoJSON → 지도 SVG 생성 (경계 + 지역명 라벨) |
-| `build_page.py` | 템플릿 + SVG → index.html 빌드 |
+| `build_page.py` | 소스 → index.html + app.js + 지도 SVG 빌드 |
+| `make_sigungu_map.py` / `make_japan_map.py` | GeoJSON → 지도 SVG 생성 |
+| `fetch_tourapi_photos.py` / `download_festival_photos.py` | 축제 일정·사진 갱신 (연 1회 자동 실행) |
 | `climate.json` / `festivals.json` / `trending.json` | 추천 점수에 쓰는 기후·계절·큐레이션 데이터 |
+| `tools/` | 한 번만 돌리는 스크립트 (심벌 수집, 아이콘 생성, 기후 좌표 산출 등) |
+
+지도 SVG(382KB)와 앱 스크립트는 `index.html`에 넣지 않고 따로 낸다.
+HTML은 network-first로 받으므로 인라인이면 열 때마다 다시 받게 되기 때문이다.
+별도 파일은 서비스워커 캐시에 남아 재방문 때 내려받지 않는다.
 
 ### API
 
