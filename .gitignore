@@ -24,3 +24,6 @@ fest2.log
 moved_codes_jp.json
 climate_jp.log
 tourapi_all_titles.json
+tourapi-proxy/.secret
+tourapi-proxy/.vercel
+run2.log

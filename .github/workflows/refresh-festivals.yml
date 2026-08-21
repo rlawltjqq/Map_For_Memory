@@ -29,6 +29,10 @@ jobs:
       - name: TourAPI에서 축제 일정·사진 받기
         env:
           TOUR_API_KEY: ${{ secrets.TOUR_API_KEY }}
+          # data.go.kr은 해외 IP에서 연결이 자주 끊긴다(러너에서 절반 넘게 실패).
+          # 서울 리전 프록시를 거쳐 국내에서 나가게 한다.
+          TOUR_PROXY_URL: ${{ secrets.TOUR_PROXY_URL }}
+          TOUR_PROXY_SECRET: ${{ secrets.TOUR_PROXY_SECRET }}
         run: python fetch_tourapi_photos.py
 
       - name: 사진 내려받기

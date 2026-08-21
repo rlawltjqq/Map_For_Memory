@@ -29,18 +29,22 @@ HOSTS = [
 UA = {"User-Agent": "MapForMemory/1.0"}
 
 
-def load_key():
-    key = os.environ.get("TOUR_API_KEY")
-    if key:
-        return key.strip()
+def env(name):
+    v = os.environ.get(name)
+    if v:
+        return v.strip()
     try:
         with open(".env.local", encoding="utf-8") as f:
             for line in f:
-                if line.strip().startswith("TOUR_API_KEY="):
+                if line.strip().startswith(name + "="):
                     return line.split("=", 1)[1].strip().strip('"').strip("'")
     except FileNotFoundError:
         pass
     return None
+
+
+def load_key():
+    return env("TOUR_API_KEY")
 
 
 def fetch_page(base, op, key, start_date, page, rows=100):
@@ -49,7 +53,15 @@ def fetch_page(base, op, key, start_date, page, rows=100):
         "_type": "json", "eventStartDate": start_date,
         "numOfRows": rows, "pageNo": page, "arrange": "A",
     }, safe="%")           # 인증키에 이미 %가 들어있을 수 있어 다시 인코딩하지 않는다
-    req = urllib.request.Request(f"{base}/{op}?{qs}", headers=UA)
+
+    # data.go.kr은 해외 IP에서 연결이 자주 끊긴다(GitHub 러너에서 절반 넘게 실패).
+    # 서울 리전 프록시가 설정돼 있으면 그쪽을 거쳐 국내에서 나가게 한다.
+    proxy, secret = env("TOUR_PROXY_URL"), env("TOUR_PROXY_SECRET")
+    if proxy and secret:
+        purl = f"{proxy}?start={start_date}&page={page}&rows={rows}"
+        req = urllib.request.Request(purl, headers={**UA, "x-proxy-secret": secret})
+    else:
+        req = urllib.request.Request(f"{base}/{op}?{qs}", headers=UA)
     # data.go.kr은 해외(GitHub 러너)에서 연결 자체가 자주 끊긴다. 간헐적이라
     # 오래 붙들고 여러 번 시도하면 대개 뚫린다. 연 1회 작업이라 기다려도 된다.
     last = None
@@ -76,8 +88,10 @@ def fetch_page(base, op, key, start_date, page, rows=100):
 
 
 def fetch_all(key, start_date):
+    # 프록시를 쓰면 엔드포인트 선택은 프록시가 하므로 한 번만 돈다
+    hosts = HOSTS[:1] if (env("TOUR_PROXY_URL") and env("TOUR_PROXY_SECRET")) else HOSTS
     last_err = None
-    for base, op in HOSTS:
+    for base, op in hosts:
         try:
             first, total = fetch_page(base, op, key, start_date, 1)
             out = list(first)
