@@ -241,12 +241,31 @@ class Handler(SimpleHTTPRequestHandler):
                     if item["id"] or item["start"] or item["end"] or item["memo"]:
                         clean.append(item)
                 notes = meta.setdefault("notes", {})
-                if not clean:
+
+                # 두 사람이 같은 지역에 기록을 남길 때 통째로 덮어쓰면 먼저 저장한
+                # 쪽이 사라진다. 방문마다 고유 id가 있으니 항목 단위로 합친다.
+                # removed(지운 id)가 없으면 예전 방식(전체 교체).
+                removed = body.get("removed")
+                merged = clean
+                if isinstance(removed, list):
+                    gone = {r for r in removed if isinstance(r, str)}
+                    prev = (notes.get(code) or {}).get("visits", [])
+                    by_id = {}
+                    for v in prev:
+                        if v.get("id") and v["id"] not in gone:
+                            by_id[v["id"]] = v
+                    for v in clean:
+                        if v.get("id"):
+                            by_id[v["id"]] = v        # 내 변경이 우선
+                    no_id = [v for v in prev if not v.get("id")]
+                    merged = (no_id + list(by_id.values()))[:50]
+
+                if not merged:
                     notes.pop(code, None)
                 else:
-                    notes[code] = {"visits": clean}
+                    notes[code] = {"visits": merged}
                 save_rooms(rooms)
-            self.send_json({"ok": True})
+            self.send_json({"ok": True, "visits": merged})
             return
 
         if url.path == "/api/photo":

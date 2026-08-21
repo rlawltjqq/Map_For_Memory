@@ -776,6 +776,7 @@ function renderVisits() {
         photos[code] = (photos[code] || []).filter(x => x.url !== p.url);
       }
       if (photos[code] && !photos[code].length) delete photos[code];
+      if (gone) noteRemoved(code, gone.id);   // 서버가 이 항목만 지우도록
       vs.splice(i, 1);
       saveVisits(code, vs);
       renderPanel();
@@ -787,6 +788,16 @@ function renderVisits() {
     wirePhotoGrid(card, selected);
   });
 }
+// 지운 방문 기록의 id를 지역별로 모아둔다.
+// 서버는 '안 보낸 항목'이 삭제인지 모르는 것인지 구분할 수 없으므로,
+// 지운 id를 함께 보내야 같이 쓰는 사람의 기록을 지우지 않고 합칠 수 있다.
+const removedVisits = new Map();
+function noteRemoved(code, id) {
+  if (!id) return;
+  const set = removedVisits.get(code) || new Set();
+  set.add(id);
+  removedVisits.set(code, set);
+}
 function saveVisits(code, visits) {
   markDirty(code);
   // 사용자가 명시적으로 추가한 방문은 비어 있어도 유지 (사진·날짜를 나중에 채울 수 있게)
@@ -796,10 +807,20 @@ function saveVisits(code, visits) {
   // 방문 기록을 남겼는데 아직 미방문이면 자동으로 방문 처리
   if (clean.length && !visited.has(code)) toggleVisited(code);
   renderFeed();
+  const removed = [...(removedVisits.get(code) || [])];
   api("/api/note", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ room: ROOM, code, visits: clean })
-  }).then(() => setBadge(true)).catch(() => setBadge(false));
+    body: JSON.stringify({ room: ROOM, code, visits: clean, removed })
+  }).then(r => {
+    setBadge(true);
+    // 서버가 합쳐준 결과를 받아 다른 사람이 같은 지역에 남긴 기록도 바로 보이게 한다
+    if (r && Array.isArray(r.visits)) {
+      if (r.visits.length) notes[code] = { visits: r.visits };
+      else delete notes[code];
+      renderFeed();
+      if (selected === code) renderVisits();
+    }
+  }).catch(() => setBadge(false));
 }
 let pendingVid = "";   // 어느 방문 기록에 사진을 올릴지
 $("addVisitBtn").onclick = () => {

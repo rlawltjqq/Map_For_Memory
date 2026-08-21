@@ -691,12 +691,12 @@
   var host = document.getElementById("mapHost");
   function boot() {
     var s = document.createElement("script");
-    s.src = "app.js?v=ae4056a1";
+    s.src = "app.js?v=3f33b80f";
     document.body.appendChild(s);
   }
   Promise.all([
-    fetch("map_kr.svg?v=ae4056a1").then(function (r) { return r.text(); }),
-    fetch("map_jp.svg?v=ae4056a1").then(function (r) { return r.text(); })
+    fetch("map_kr.svg?v=3f33b80f").then(function (r) { return r.text(); }),
+    fetch("map_jp.svg?v=3f33b80f").then(function (r) { return r.text(); })
   ]).then(function (parts) {
     host.innerHTML = parts[0] + parts[1];
     boot();
