@@ -257,8 +257,15 @@ class Handler(SimpleHTTPRequestHandler):
                     for v in clean:
                         if v.get("id"):
                             by_id[v["id"]] = v        # 내 변경이 우선
-                    no_id = [v for v in prev if not v.get("id")]
-                    merged = (no_id + list(by_id.values()))[:50]
+                    # id 없는 예전 자료는 지울 방법이 없어 중복으로 남는다.
+                    # 같은 내용이 id 있는 항목으로 들어와 있으면 옛 항목은 버린다.
+                    same = {(v.get("start"), v.get("end"), v.get("memo"))
+                            for v in by_id.values()}
+                    no_id = [v for v in prev if not v.get("id")
+                             and (v.get("start"), v.get("end"), v.get("memo")) not in same]
+                    allv = no_id + list(by_id.values())
+                    # 상한을 넘으면 방금 저장한 것이 아니라 오래된 것부터 버린다
+                    merged = allv if len(allv) <= 50 else allv[-50:]
 
                 if not merged:
                     notes.pop(code, None)

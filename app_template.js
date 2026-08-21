@@ -177,7 +177,6 @@ async function enterRoom(id) {
       migrateMergedCodes().catch(() => {});
       setBadge(true);
       updateLabels();
-      setTimeout(backfillThumbs, 3000);   // 첫 화면이 뜬 뒤에 조용히
     } else {
       startApp(s);
     }
@@ -234,7 +233,6 @@ function startApp(state, runMigrations = true) {
   if (runMigrations) migrateMergedCodes().catch(() => {});
   setBadge(true);
   updateLabels();
-  setTimeout(backfillThumbs, 3000);   // 첫 화면이 뜬 뒤에 조용히
   maybeShowFirstHint();
   clearInterval(pollTimer);
   pollTimer = setInterval(refresh, 12000);   // 다른 사람의 변경 반영
@@ -798,8 +796,12 @@ function noteRemoved(code, id) {
   set.add(id);
   removedVisits.set(code, set);
 }
+// 지역별 저장 순번 — 늦게 도착한 응답이 더 새 편집을 되돌리지 않게 한다
+const saveSeq = new Map();
 function saveVisits(code, visits) {
   markDirty(code);
+  const seq = (saveSeq.get(code) || 0) + 1;
+  saveSeq.set(code, seq);
   // 사용자가 명시적으로 추가한 방문은 비어 있어도 유지 (사진·날짜를 나중에 채울 수 있게)
   const clean = visits.filter(v => v.id);
   if (clean.length) notes[code] = { visits: clean };
@@ -816,6 +818,8 @@ function saveVisits(code, visits) {
     body: JSON.stringify({ room: ROOM, code, visits: clean, removed })
   }).then(r => {
     setBadge(true);
+    // 이 응답이 나온 뒤 다시 저장했다면 그쪽이 최신이다. 되돌리지 않는다.
+    if (saveSeq.get(code) !== seq) return;
     // 서버가 반영했으니 삭제 목록은 비운다 (세션 내내 쌓이지 않게)
     removedVisits.delete(code);
     // 서버가 합쳐준 결과를 받아 다른 사람이 같은 지역에 남긴 기록도 바로 보이게 한다
@@ -823,7 +827,10 @@ function saveVisits(code, visits) {
       if (r.visits.length) notes[code] = { visits: r.visits };
       else delete notes[code];
       renderFeed();
-      if (selected === code) renderVisits();
+      // 입력 중에는 다시 그리지 않는다 (타이핑하던 글자와 포커스가 날아간다)
+      const ae = document.activeElement;
+      const typing = ae && regionPanelEl && regionPanelEl.contains(ae);
+      if (selected === code && !typing) renderVisits();
     }
   }).catch(() => setBadge(false));
 }
@@ -1296,35 +1303,7 @@ async function compressImage(file, max = 1600, quality = 0.85, outputType = "ima
 // 사진 한 장에 수백 KB가 들어 모바일에서 한참 걸린다.
 const thumbOf = p => p.thumb || p.url;
 
-// 썸네일이 도입되기 전에 올린 사진은 목록에서도 원본(수백 KB)을 받는다.
-// 지도를 열었을 때 그런 사진을 찾아 조용히 썸네일을 만들어 올려둔다.
-// 한 번만 하면 되고, 실패해도 원본으로 계속 보이므로 조용히 넘어간다.
-let thumbFillRan = false;
-async function backfillThumbs() {
-  if (thumbFillRan || !ROOM) return;
-  thumbFillRan = true;
-  const todo = [];
-  for (const [code, list] of Object.entries(photos)) {
-    for (const p of list || []) if (p.url && !p.thumb) todo.push({ code, p });
-  }
-  if (!todo.length) return;
-  for (const { code, p } of todo.slice(0, 40)) {     // 한 번에 너무 많이 하지 않는다
-    try {
-      const res = await fetch(p.url);
-      if (!res.ok) continue;
-      const file = new File([await res.blob()], (p.name || "photo.jpg"), { type: "image/jpeg" });
-      const t = await compressImage(file, 400, 0.7);
-      const r = await api(`/api/photo?room=${ROOM}&code=${code}&thumbfor=${encodeURIComponent(p.url)}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/octet-stream", "X-Filename": encodeURIComponent(t.name) },
-        body: t.blob
-      });
-      p.thumb = r.thumb;
-    } catch { /* 원본으로 계속 보이므로 넘어간다 */ }
-  }
-  renderFeed();
-  if (selected) renderPanel();
-}
+
 
 // 썸네일 기능 도입 전에 올린 사진은 원본이 한 번 표시된 뒤, 유휴 시간에 작은 썸네일을 만든다.
 // 실제로 화면에 나타난 사진만 한 장씩 처리해 첫 화면 네트워크를 방해하지 않는다.

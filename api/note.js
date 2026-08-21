@@ -1,4 +1,4 @@
-import { redis, authRoom } from "./_lib.js";
+import { redis, authRoom, withLock } from "./_lib.js";
 
 // 지역별 방문 기록: { visits: [ { start:"2026-07-15", end:"2026-07-16", memo:"..." }, ... ] }
 function isDate(s) {
@@ -29,19 +29,31 @@ export default async function handler(req, res) {
   // 먼저 저장된 쪽이 사라진다. 방문마다 고유 id가 있으므로 항목 단위로 합친다.
   // removed(지운 id 목록)를 함께 받아야 '안 보낸 항목'이 삭제인지 모르는 것인지
   // 구분할 수 있다. removed가 없으면 예전 방식(전체 교체)으로 둔다.
-  let merged = clean;
-  if (Array.isArray(removed)) {
+  if (!Array.isArray(removed)) {
+    // 옛 클라이언트: 종전대로 전체 교체
+    if (clean.length === 0) await redis.hdel(key, String(code));
+    else await redis.hset(key, { [String(code)]: { visits: clean } });
+    return res.json({ ok: true, visits: clean });
+  }
+
+  // 읽고-고쳐-쓰기라 잠금이 없으면 동시에 저장할 때 한쪽이 사라진다
+  const merged = await withLock(`${room}:notes:${code}`, async () => {
     const gone = new Set(removed.filter((x) => typeof x === "string").map(String));
     const prev = ((await redis.hget(key, String(code))) || {}).visits || [];
     const byId = new Map();
     for (const v of prev) if (v && v.id && !gone.has(v.id)) byId.set(v.id, v);
     for (const v of clean) if (v.id) byId.set(v.id, v);      // 내 변경이 우선
-    // id 없는 항목(예전 자료)은 그대로 살린다
-    const noId = prev.filter((v) => v && !v.id);
-    merged = [...noId, ...byId.values()].slice(0, 50);
-  }
+    // id 없는 예전 자료는 지울 방법이 없어 중복으로 남는다.
+    // 같은 내용이 id 있는 항목으로 들어와 있으면 옛 항목은 버린다.
+    const same = new Set([...byId.values()].map((v) => `${v.start}|${v.end}|${v.memo}`));
+    const noId = prev.filter((v) => v && !v.id && !same.has(`${v.start}|${v.end}|${v.memo}`));
+    // 상한을 넘으면 방금 저장한 항목이 아니라 오래된 것부터 버린다
+    const all = [...noId, ...byId.values()];
+    const out = all.length <= 50 ? all : all.slice(all.length - 50);
 
-  if (merged.length === 0) await redis.hdel(key, String(code));
-  else await redis.hset(key, { [String(code)]: { visits: merged } });
+    if (out.length === 0) await redis.hdel(key, String(code));
+    else await redis.hset(key, { [String(code)]: { visits: out } });
+    return out;
+  });
   res.json({ ok: true, visits: merged });
 }

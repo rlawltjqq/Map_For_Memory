@@ -122,6 +122,19 @@ def core_tokens(name):
     return [t for t in re.split(r"(축제|페스티벌|제)", n) if len(t) >= 2]
 
 
+def months_between(start, end):
+    """실제 일정이 걸친 달 (연말연시에 걸치면 12,1 순서 유지)"""
+    y1, m1 = int(start[:4]), int(start[4:6])
+    y2, m2 = int(end[:4]), int(end[4:6])
+    out, y, m = [], y1, m1
+    while (y, m) <= (y2, m2) and len(out) < 6:
+        out.append(m)
+        m += 1
+        if m > 12:
+            m, y = 1, y + 1
+    return out
+
+
 def match(fes_name, api_titles, region="", alias=""):
     """우리 축제명 <-> TourAPI 축제명. 한쪽이 다른 쪽을 품으면 채택."""
     # 공식 명칭이 우리 표기와 아주 다른 축제는 별칭으로 바로 찾는다
@@ -200,6 +213,27 @@ def main():
                             "url": img, "author": "한국관광공사",
                             "license": "공공누리 (출처표시)"}
             added += 1
+
+    # 받은 일정을 festivals.json에 바로 반영한다.
+    # tourapi_festivals.json은 gitignore 대상이라 여기에만 쓰면 자동 갱신을
+    # 돌려도 날짜가 영영 그대로 남는다(빌드는 festivals.json을 읽는다).
+    changed = 0
+    for fes in fes_raw.get("kr", []):
+        rec = out.get(fes["name"])
+        if not rec:
+            continue
+        st, en = rec.get("start"), rec.get("end")
+        if not (st and en and re.fullmatch(r"\d{8}", str(st)) and re.fullmatch(r"\d{8}", str(en))):
+            continue
+        months = months_between(str(st), str(en))
+        if (fes.get("start"), fes.get("end"), fes.get("months")) == (st, en, months):
+            continue
+        fes["start"], fes["end"], fes["months"] = st, en, months
+        changed += 1
+    if changed:
+        with open("festivals.json", "w", encoding="utf-8") as f:
+            json.dump(fes_raw, f, ensure_ascii=False, indent=2)
+    print(f"festivals.json 일정 갱신 {changed}건")
 
     with open("tourapi_festivals.json", "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=1)

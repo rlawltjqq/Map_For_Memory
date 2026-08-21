@@ -56,7 +56,19 @@ self.addEventListener("fetch", (e) => {
   if (url.origin === location.origin) {
     e.respondWith(
       caches.match(req).then((hit) => hit || fetch(req).then((res) => {
-        if (res.ok) { const copy = res.clone(); caches.open(ASSETS).then((c) => c.put(req, copy)); }
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(ASSETS).then(async (c) => {
+            // 빌드마다 주소가 바뀌므로(?v=해시) 옛 빌드가 계속 쌓인다.
+            // 같은 경로의 지난 판본은 지우고 최신 것만 남긴다.
+            for (const k of await c.keys()) {
+              const u = new URL(k.url);
+              if (u.origin === url.origin && u.pathname === url.pathname &&
+                  u.search !== url.search) await c.delete(k);
+            }
+            c.put(req, copy);
+          });
+        }
         return res;
       }))
     );

@@ -1,5 +1,5 @@
 import { put, del } from "@vercel/blob";
-import { redis, authRoom } from "./_lib.js";
+import { redis, authRoom, withLock } from "./_lib.js";
 
 // 백업 복원은 이미 올라간 사진 URL만 다시 연결한다.
 // 외부 주소를 끼워 넣지 못하도록 우리 저장소 도메인만 허용.
@@ -25,6 +25,7 @@ export default async function handler(req, res) {
     if (req.query.link === "1") {
       const b = req.body || {};
       if (!isOwnPhotoUrl(b.url)) return res.status(400).json({ error: "bad url" });
+      await withLock(`${room}:photos:${code}`, async () => {
       const list = (await redis.hget(key, code)) || [];
       if (!list.some((p) => p.url === b.url)) {
         list.push({
@@ -35,6 +36,7 @@ export default async function handler(req, res) {
         });
         await redis.hset(key, { [code]: list });
       }
+      });
       return res.json({ ok: true, url: b.url });
     }
     const name = decodeURIComponent(req.headers["x-filename"] || "photo.jpg")
@@ -48,60 +50,75 @@ export default async function handler(req, res) {
     const thumbFor = req.query.thumbfor;
     if (thumbFor) {
       if (!isOwnPhotoUrl(thumbFor)) return res.status(400).json({ error: "bad url" });
-      const list = (await redis.hget(key, code)) || [];
-      const idx = list.findIndex((p) => p.url === thumbFor);
-      if (idx < 0) return res.status(404).json({ error: "not found" });
       const tb = await put(`rooms/${room}/${code}/t_${Date.now()}_${name}`, body, {
         access: "public",
       });
-      list[idx] = { ...list[idx], thumb: tb.url };
-      await redis.hset(key, { [code]: list });
+      const ok = await withLock(`${room}:photos:${code}`, async () => {
+        const list = (await redis.hget(key, code)) || [];
+        const idx = list.findIndex((p) => p.url === thumbFor);
+        if (idx < 0) return false;
+        list[idx] = { ...list[idx], thumb: tb.url };
+        await redis.hset(key, { [code]: list });
+        return true;
+      });
+      if (!ok) return res.status(404).json({ error: "not found" });
       return res.json({ ok: true, thumb: tb.url });
     }
     const blob = await put(`rooms/${room}/${code}/${Date.now()}_${name}`, body, {
       access: "public",
     });
-    const list = (await redis.hget(key, code)) || [];
-    list.push({ url: blob.url, name, vid: visitId });
-    await redis.hset(key, { [code]: list });
+    // 동시에 올리면 읽고-고쳐-쓰기가 겹쳐 한 장이 사라진다
+    await withLock(`${room}:photos:${code}`, async () => {
+      const list = (await redis.hget(key, code)) || [];
+      list.push({ url: blob.url, name, vid: visitId });
+      await redis.hset(key, { [code]: list });
+    });
     return res.json({ ok: true, url: blob.url, name, vid: visitId });
   }
 
   // 사진을 다른 방문 기록으로 이동 (vid="" 이면 미지정으로)
   if (req.method === "PUT") {
     const { url } = req.body || {};
-    const list = (await redis.hget(key, code)) || [];
-    const idx = list.findIndex((p) => p.url === url);
-    if (idx < 0) return res.status(404).json({ error: "not found" });
-
-    // 지역 통합 시 사진의 코드 버킷도 함께 이동
     const to = typeof req.query.to === "string" && /^\d+$/.test(req.query.to) ? req.query.to : "";
-    if (to && to !== code) {
-      const item = list[idx];
-      const target = (await redis.hget(key, to)) || [];
-      if (!target.some((p) => p.url === url)) target.push(item);
-      await redis.hset(key, { [to]: target });
-      list.splice(idx, 1);
-      if (list.length) await redis.hset(key, { [code]: list });
-      else await redis.hdel(key, code);
-      return res.json({ ok: true, vid: item.vid || "", code: to });
-    }
+    const r = await withLock(`${room}:photos:${code}`, async () => {
+      const list = (await redis.hget(key, code)) || [];
+      const idx = list.findIndex((p) => p.url === url);
+      if (idx < 0) return null;
 
-    list[idx] = { ...list[idx], vid: visitId };
-    await redis.hset(key, { [code]: list });
-    return res.json({ ok: true, vid: visitId });
+      // 지역 통합 시 사진의 코드 버킷도 함께 이동
+      if (to && to !== code) {
+        const item = list[idx];
+        const target = (await redis.hget(key, to)) || [];
+        if (!target.some((p) => p.url === url)) target.push(item);
+        await redis.hset(key, { [to]: target });
+        list.splice(idx, 1);
+        if (list.length) await redis.hset(key, { [code]: list });
+        else await redis.hdel(key, code);
+        return { ok: true, vid: item.vid || "", code: to };
+      }
+
+      list[idx] = { ...list[idx], vid: visitId };
+      await redis.hset(key, { [code]: list });
+      return { ok: true, vid: visitId };
+    });
+    if (!r) return res.status(404).json({ error: "not found" });
+    return res.json(r);
   }
 
   if (req.method === "DELETE") {
     const { url } = req.body || {};
-    const list = (await redis.hget(key, code)) || [];
-    const gone = list.find((p) => p.url === url);
-    if (gone) {
-      await del(url).catch(() => {});
-      if (gone.thumb) await del(gone.thumb).catch(() => {});   // 목록용 사진도 함께
+    const gone = await withLock(`${room}:photos:${code}`, async () => {
+      const list = (await redis.hget(key, code)) || [];
+      const found = list.find((p) => p.url === url);
+      if (!found) return null;
       const rest = list.filter((p) => p.url !== url);
       if (rest.length) await redis.hset(key, { [code]: rest });
       else await redis.hdel(key, code);
+      return found;
+    });
+    if (gone) {
+      await del(url).catch(() => {});
+      if (gone.thumb) await del(gone.thumb).catch(() => {});   // 목록용 사진도 함께
     }
     return res.json({ ok: true });
   }

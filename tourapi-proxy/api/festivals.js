@@ -22,7 +22,10 @@ export default async function handler(req, res) {
   if (!/^\d{1,4}$/.test(page) || !/^\d{1,3}$/.test(rows))
     return res.status(400).json({ error: "bad paging" });
 
-  const qs = `serviceKey=${key}&MobileOS=ETC&MobileApp=MapForMemory&_type=json` +
+  // 인증키는 이미 %가 든 인코딩 형태로 오는 경우와 원본(+, /, = 포함)인 경우가
+  // 모두 있다. 원본이면 인코딩하고, 이미 인코딩돼 있으면 그대로 둔다.
+  const encoded = /%[0-9A-Fa-f]{2}/.test(key) ? key : encodeURIComponent(key);
+  const qs = `serviceKey=${encoded}&MobileOS=ETC&MobileApp=MapForMemory&_type=json` +
              `&eventStartDate=${start}&numOfRows=${rows}&pageNo=${page}&arrange=A`;
 
   let lastErr = null;
