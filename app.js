@@ -807,12 +807,17 @@ function saveVisits(code, visits) {
   // 방문 기록을 남겼는데 아직 미방문이면 자동으로 방문 처리
   if (clean.length && !visited.has(code)) toggleVisited(code);
   renderFeed();
-  const removed = [...(removedVisits.get(code) || [])];
+  // 지금 살아 있는 id는 삭제 목록에서 빼낸다.
+  // 지웠던 기록이 백업 복원으로 되살아났는데 목록에 남아 있으면 다시 지워진다.
+  const alive = new Set(clean.map(v => v.id));
+  const removed = [...(removedVisits.get(code) || [])].filter(id => !alive.has(id));
   api("/api/note", {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ room: ROOM, code, visits: clean, removed })
   }).then(r => {
     setBadge(true);
+    // 서버가 반영했으니 삭제 목록은 비운다 (세션 내내 쌓이지 않게)
+    removedVisits.delete(code);
     // 서버가 합쳐준 결과를 받아 다른 사람이 같은 지역에 남긴 기록도 바로 보이게 한다
     if (r && Array.isArray(r.visits)) {
       if (r.visits.length) notes[code] = { visits: r.visits };
